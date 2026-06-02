@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { Heart, Sparkles, Wallet, Flower2, Footprints, BookHeart, CalendarHeart, Newspaper, Menu, Instagram, Music2, Mail, ArrowRight, Star } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import heroGirl from "@/assets/hero-girl.jpg";
 import featBudget from "@/assets/feat-budget.jpg";
 import featYoga from "@/assets/feat-yoga.jpg";
@@ -8,18 +8,6 @@ import featSteps from "@/assets/feat-steps.jpg";
 import featDiary from "@/assets/feat-diary.jpg";
 import featCycle from "@/assets/feat-cycle.jpg";
 import featBlog from "@/assets/feat-blog.jpg";
-
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Bloom — Tools to Help Every Girl Bloom" },
-      { name: "description", content: "Bloom is the cutest little app for girls — budget planners, yoga flows, step trackers, diaries, period trackers & feel-good blogs." },
-      { property: "og:title", content: "Bloom — Tools to Help Every Girl Bloom" },
-      { property: "og:description", content: "Budget planners, yoga, steps, diaries & cycle tracking — all wrapped in pink." },
-    ],
-  }),
-  component: Bloom,
-});
 
 const tools = [
   { icon: Wallet, title: "Budget Planner", desc: "Glow up your finances with cute trackers & savings goals.", img: featBudget, tag: "Money" },
@@ -30,27 +18,24 @@ const tools = [
   { icon: Newspaper, title: "Bloom Blog", desc: "Tips, stories & rituals for the modern girl.", img: featBlog, tag: "Read" },
 ];
 
-function Sparkle({ className = "" }: { className?: string }) {
+function SparkleIcon({ className = "" }: { className?: string }) {
   return <Sparkles className={`absolute text-primary animate-sparkle ${className}`} />;
 }
 
-function Bloom() {
+export default function Landing() {
   const [email, setEmail] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen overflow-x-hidden relative">
-      {/* floating sparkles */}
-      <Sparkle className="top-20 left-4 size-4" />
-      <Sparkle className="top-40 right-6 size-5" />
-      <Sparkle className="top-[55%] left-2 size-3" />
+      <SparkleIcon className="top-20 left-4 size-4" />
+      <SparkleIcon className="top-40 right-6 size-5" />
+      <SparkleIcon className="top-[55%] left-2 size-3" />
 
-      {/* Announcement bar */}
       <div className="bg-gradient-pink text-primary-foreground text-xs sm:text-sm py-2 text-center font-semibold tracking-wide">
         ✿ NEW! Bloom Premium is here — get 20% off today ✿
       </div>
 
-      {/* Nav */}
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur border-b border-secondary">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <a href="#" className="flex items-center gap-2">
@@ -83,13 +68,9 @@ function Bloom() {
         )}
       </header>
 
-      {/* Hero — retro dotted bg */}
       <section className="relative px-4 pt-8 pb-16 bg-dots">
         <div className="max-w-6xl mx-auto bg-gradient-hero rounded-[2.5rem] p-6 sm:p-10 md:p-14 relative overflow-hidden shadow-pink border-pop">
-          {/* spinning retro sun */}
           <div className="absolute -top-20 -right-20 size-60 rounded-full bg-sunburst opacity-30 animate-spin-slow" />
-
-          {/* decorative hearts */}
           <Heart className="absolute top-6 right-8 size-6 text-primary fill-primary animate-float" />
           <Heart className="absolute bottom-10 left-8 size-5 text-hot fill-hot animate-float" style={{animationDelay:'1s'}} />
           <Sparkles className="absolute top-12 left-12 size-5 text-primary-foreground/70 animate-sparkle" />
@@ -118,9 +99,9 @@ function Bloom() {
                 The cutest little app packed with tools for the modern girl — budgets, yoga, steps, diaries, cycles & feel-good reads. All in pink. 💕
               </p>
               <div className="mt-7 flex flex-wrap gap-3 justify-center md:justify-start">
-                <a href="#tools" className="inline-flex items-center gap-2 bg-gradient-pink text-primary-foreground font-bold px-6 py-3 rounded-full shadow-pink hover:scale-105 transition">
-                  Explore Tools <ArrowRight className="size-4"/>
-                </a>
+                <Link to="/" className="inline-flex items-center gap-2 bg-gradient-pink text-primary-foreground font-bold px-6 py-3 rounded-full shadow-pink hover:scale-105 transition">
+                  Open the App <ArrowRight className="size-4"/>
+                </Link>
                 <a href="#subscribe" className="inline-flex items-center gap-2 bg-card text-primary font-bold px-6 py-3 rounded-full border-2 border-primary hover:bg-primary hover:text-primary-foreground transition">
                   Join Bloom
                 </a>
@@ -130,7 +111,6 @@ function Bloom() {
         </div>
       </section>
 
-      {/* Mini tool icons strip on checker bg */}
       <section className="px-4 -mt-6 relative z-10">
         <div className="max-w-5xl mx-auto bg-card rounded-3xl shadow-soft p-4 sm:p-6 grid grid-cols-3 sm:grid-cols-6 gap-3 border-pop">
           {tools.map(({ icon: Icon, title }) => (
@@ -144,7 +124,6 @@ function Bloom() {
         </div>
       </section>
 
-      {/* Marquee Banner — retro stripes */}
       <section className="px-4 py-10">
         <div className="max-w-6xl mx-auto bg-stripes animate-stripes text-primary-foreground rounded-2xl py-6 px-4 grid grid-cols-3 text-center text-xs sm:text-base font-black border-pop">
           <div className="px-2 drop-shadow">✨ NEW DROP</div>
@@ -153,9 +132,7 @@ function Bloom() {
         </div>
       </section>
 
-      {/* Tools — checker pattern background */}
       <section id="tools" className="px-4 py-16 bg-checker relative">
-
         <div className="max-w-3xl mx-auto mb-12 relative z-10">
           <div className="bg-card rounded-3xl px-6 py-8 sm:px-10 sm:py-10 text-center shadow-pink border-pop">
             <p className="font-script text-2xl text-hot">all your faves in one place</p>
@@ -163,7 +140,6 @@ function Bloom() {
             <p className="text-secondary-foreground mt-4 max-w-xl mx-auto">Six dreamy little tools designed to make every part of your day softer, prettier and easier.</p>
           </div>
         </div>
-
 
         <div id="bestsellers" className="max-w-6xl mx-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
           {tools.map(({ icon: Icon, title, desc, img, tag }, i) => (
@@ -187,7 +163,6 @@ function Bloom() {
         </div>
       </section>
 
-      {/* Quote / vibe — sunburst bg */}
       <section id="blog" className="px-4 py-16 relative overflow-hidden">
         <div className="absolute inset-0 bg-sunburst opacity-20 animate-spin-slow" />
         <div className="max-w-4xl mx-auto bg-card rounded-3xl p-8 sm:p-12 text-center shadow-pink relative overflow-hidden border-pop">
@@ -201,9 +176,7 @@ function Bloom() {
         </div>
       </section>
 
-      {/* Subscribe — dotted bg */}
       <section id="subscribe" className="px-4 py-12 bg-dots-lg">
-
         <div className="max-w-4xl mx-auto bg-gradient-pink rounded-[2.5rem] p-8 sm:p-12 text-center text-primary-foreground shadow-pink relative overflow-hidden border-pop">
           <Sparkles className="absolute top-6 left-8 size-6 animate-sparkle"/>
           <Sparkles className="absolute bottom-8 right-10 size-5 animate-sparkle" style={{animationDelay:'.8s'}}/>
@@ -213,7 +186,6 @@ function Bloom() {
           <h2 className="font-display text-4xl sm:text-5xl">Subscribe</h2>
           <p className="font-script text-2xl mt-1">to our pink little newsletter</p>
           <p className="mt-3 opacity-90 text-sm sm:text-base">Weekly tips, free printables & secret discounts — straight to your inbox.</p>
-
           <form onSubmit={(e)=>{e.preventDefault(); setEmail("");}} className="mt-6 flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
             <input
               type="email" required value={email} onChange={(e)=>setEmail(e.target.value)}
@@ -227,7 +199,6 @@ function Bloom() {
         </div>
       </section>
 
-      {/* Footer — striped */}
       <footer className="mt-4">
         <div className="bg-stripes h-4 w-full" />
         <div className="bg-card px-4 pb-10 pt-8">
@@ -243,4 +214,3 @@ function Bloom() {
     </div>
   );
 }
-
