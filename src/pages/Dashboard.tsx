@@ -108,7 +108,7 @@ export default function Dashboard() {
               <p className="text-xs font-bold text-secondary-foreground">{cycle.phase} · next in {cycle.daysUntilNext}d</p>
             </>
           ) : (
-            <Link to="/tools/period" className="mt-2 block text-sm font-bold text-primary">Log your period →</Link>
+            <Link to="/app/tools/period" className="mt-2 block text-sm font-bold text-primary">Log your period →</Link>
           )}
         </SoftCard>
 
@@ -147,7 +147,7 @@ export default function Dashboard() {
             <CheckCircle2 className="size-5" /> today's to-dos
           </p>
           {todayTasks.length === 0 ? (
-            <Link to="/tools/planner" className="text-sm font-bold text-primary">Plan your day →</Link>
+            <Link to="/app/tools/planner" className="text-sm font-bold text-primary">Plan your day →</Link>
           ) : (
             <ul className="flex flex-col gap-2">
               {todayTasks.slice(0, 5).map((t) => (

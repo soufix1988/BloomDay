@@ -25,7 +25,7 @@ const TOOL_PAGES: Record<string, React.ComponentType> = {
 function ToolPage() {
   const { slug } = useParams<{ slug: string }>();
   const Page = slug ? TOOL_PAGES[slug] : undefined;
-  if (!Page) return <Navigate to="/" replace />;
+  if (!Page) return <Navigate to="/app" replace />;
   return <Page />;
 }
 
@@ -33,11 +33,16 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/welcome" element={<Landing />} />
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/tools/:slug" element={<ToolPage />} />
+        {/* Landing page — home */}
+        <Route path="/" element={<Landing />} />
+
+        {/* App shell — dashboard + all tools */}
+        <Route path="/app" element={<AppLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="tools/:slug" element={<ToolPage />} />
         </Route>
+
+        {/* Catch-all → landing */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
