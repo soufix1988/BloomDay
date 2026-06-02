@@ -1,9 +1,3 @@
 {
-  "framework": null,
-  "buildCommand": "npm run build",
-  "build": {
-    "env": {
-      "NITRO_PRESET": "vercel"
-    }
-  }
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
