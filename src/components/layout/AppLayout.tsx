@@ -10,7 +10,7 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex flex-col gap-1">
       <NavLink
-        to="/"
+        to="/app"
         end
         onClick={onNavigate}
         className={({ isActive }) =>
@@ -35,7 +35,7 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
         return (
           <NavLink
             key={t.slug}
-            to={`/tools/${t.slug}`}
+            to={`/app/tools/${t.slug}`}
             onClick={onNavigate}
             className={({ isActive }) =>
               cn(
@@ -62,7 +62,7 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
 
 function Brand() {
   return (
-    <Link to="/" className="flex items-center gap-2 px-2">
+    <Link to="/app" className="flex items-center gap-2 px-2">
       <div className="size-9 rounded-full bg-gradient-pink grid place-items-center shadow-soft">
         <Flower2 className="size-5 text-primary-foreground" />
       </div>
@@ -85,7 +85,7 @@ export default function AppLayout() {
           <NavItems />
         </div>
         <Link
-          to="/welcome"
+          to="/"
           className="flex items-center gap-2 rounded-2xl bg-gradient-pink px-3 py-2.5 text-sm font-bold text-primary-foreground shadow-soft"
         >
           <Sparkles className="size-4" /> Bloom Premium
