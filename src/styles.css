@@ -40,42 +40,42 @@
 :root {
   --radius: 1.25rem;
 
-  --background: oklch(0.97 0.03 350);
-  --foreground: oklch(0.30 0.15 350);
+  --background: oklch(0.98 0.018 350);
+  --foreground: oklch(0.44 0.08 345);          /* soft plum — calm text */
 
-  --card: oklch(0.99 0.015 350);
-  --card-foreground: oklch(0.30 0.15 350);
+  --card: oklch(0.995 0.008 350);
+  --card-foreground: oklch(0.44 0.08 345);
 
-  --primary: oklch(0.65 0.25 355);             /* hot pink */
+  --primary: oklch(0.70 0.16 350);             /* soft rose */
   --primary-foreground: oklch(0.99 0.01 350);
 
-  --secondary: oklch(0.92 0.06 350);            /* light pink */
-  --secondary-foreground: oklch(0.40 0.20 355);
+  --secondary: oklch(0.94 0.035 350);          /* light pink */
+  --secondary-foreground: oklch(0.50 0.10 350);
 
-  --muted: oklch(0.95 0.03 350);
-  --muted-foreground: oklch(0.55 0.10 350);
+  --muted: oklch(0.96 0.02 350);
+  --muted-foreground: oklch(0.62 0.06 350);
 
-  --accent: oklch(0.85 0.13 350);
-  --accent-foreground: oklch(0.30 0.18 355);
+  --accent: oklch(0.88 0.08 350);
+  --accent-foreground: oklch(0.44 0.10 350);
 
-  --hot: oklch(0.60 0.27 0);                    /* magenta */
+  --hot: oklch(0.66 0.17 358);                  /* gentle magenta */
   --hot-foreground: oklch(0.99 0.01 350);
 
-  --bubble: oklch(0.88 0.10 350);               /* bubblegum */
-  --blush: oklch(0.94 0.05 350);                /* blush */
+  --bubble: oklch(0.92 0.06 350);               /* bubblegum */
+  --blush: oklch(0.96 0.03 350);                /* blush */
 
-  --destructive: oklch(0.6 0.24 25);
+  --destructive: oklch(0.62 0.18 25);
   --destructive-foreground: oklch(0.99 0.01 350);
 
-  --border: oklch(0.88 0.06 350);
-  --input: oklch(0.88 0.06 350);
-  --ring: oklch(0.65 0.25 355);
+  --border: oklch(0.92 0.035 350);
+  --input: oklch(0.92 0.035 350);
+  --ring: oklch(0.70 0.16 350);
 
-  --gradient-hero: linear-gradient(135deg, oklch(0.92 0.08 350), oklch(0.78 0.18 350));
+  --gradient-hero: linear-gradient(135deg, oklch(0.95 0.05 350), oklch(0.86 0.10 350));
   --gradient-pink: linear-gradient(135deg, var(--primary), var(--hot));
-  --gradient-soft: linear-gradient(180deg, var(--blush), var(--secondary));
-  --shadow-pink: 0 20px 50px -15px color-mix(in oklab, var(--primary) 45%, transparent);
-  --shadow-soft: 0 10px 30px -10px color-mix(in oklab, var(--primary) 25%, transparent);
+  --gradient-soft: linear-gradient(180deg, oklch(0.985 0.015 350), var(--blush));
+  --shadow-pink: 0 18px 40px -18px color-mix(in oklab, var(--primary) 38%, transparent);
+  --shadow-soft: 0 8px 24px -12px color-mix(in oklab, var(--primary) 22%, transparent);
 }
 
 @layer base {
@@ -167,8 +167,12 @@
     background-size: 32px 32px;
   }
 
-  .border-retro { border: 3px dashed var(--primary); }
-  .border-pop { border: 4px solid var(--foreground); box-shadow: 6px 6px 0 0 var(--hot); }
+  .border-retro { border: 2px dashed color-mix(in oklab, var(--primary) 35%, transparent); }
+  /* Soft, calm card — no more black lines, just a gentle pink edge + soft glow */
+  .border-pop {
+    border: 1px solid color-mix(in oklab, var(--primary) 16%, transparent);
+    box-shadow: var(--shadow-soft);
+  }
 
   @keyframes float-slow { 0%,100%{transform:translateY(0) rotate(0)} 50%{transform:translateY(-12px) rotate(3deg)} }
   @keyframes sparkle { 0%,100%{opacity:.4;transform:scale(1)} 50%{opacity:1;transform:scale(1.3)} }

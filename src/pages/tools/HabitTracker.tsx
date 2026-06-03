@@ -108,7 +108,7 @@ export default function HabitTracker() {
                         <span className="text-[10px] font-bold text-muted-foreground">{label}</span>
                         <span
                           className={`grid aspect-square w-full place-items-center rounded-xl border-2 transition ${
-                            isToday ? "border-foreground" : "border-transparent"
+                            isToday ? "border-primary" : "border-transparent"
                           }`}
                           style={{ background: done ? h.color : "var(--blush)" }}
                         >
