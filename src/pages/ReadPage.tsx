@@ -1,12 +1,18 @@
 import { Clock } from "lucide-react";
+import featBlog from "@/assets/feat-blog.jpg";
+import featCycle from "@/assets/feat-cycle.jpg";
+import featBudget from "@/assets/feat-budget.jpg";
+import featDiary from "@/assets/feat-diary.jpg";
+import featYoga from "@/assets/feat-yoga.jpg";
+import heroGirl from "@/assets/hero-girl.jpg";
 
 const articles = [
-  { tag: "Wellness", title: "5 soft morning rituals to start your day glowing", mins: 4, accent: "#ec7aa0", emoji: "🌅" },
-  { tag: "Cycle", title: "Understanding your cycle phases (and your moods)", mins: 6, accent: "#a87ad8", emoji: "🌸" },
-  { tag: "Money", title: "The cute girl's guide to a no-stress budget", mins: 5, accent: "#5cb874", emoji: "💰" },
-  { tag: "Mind", title: "Journaling prompts for a calmer, kinder mind", mins: 3, accent: "#efb24d", emoji: "📔" },
-  { tag: "Body", title: "Gentle movement: yoga flows for slow days", mins: 7, accent: "#5cc0cc", emoji: "🧘" },
-  { tag: "Glow", title: "Building a skincare routine you'll actually keep", mins: 5, accent: "#e88ac0", emoji: "✨" },
+  { tag: "Wellness", title: "5 soft morning rituals to start your day glowing", mins: 4, accent: "#ec7aa0", img: featBlog },
+  { tag: "Cycle", title: "Understanding your cycle phases (and your moods)", mins: 6, accent: "#a87ad8", img: featCycle },
+  { tag: "Money", title: "The cute girl's guide to a no-stress budget", mins: 5, accent: "#5cb874", img: featBudget },
+  { tag: "Mind", title: "Journaling prompts for a calmer, kinder mind", mins: 3, accent: "#efb24d", img: featDiary },
+  { tag: "Body", title: "Gentle movement: yoga flows for slow days", mins: 7, accent: "#5cc0cc", img: featYoga },
+  { tag: "Glow", title: "Building a skincare routine you'll actually keep", mins: 5, accent: "#e88ac0", img: heroGirl },
 ];
 
 export default function ReadPage() {
@@ -27,11 +33,13 @@ export default function ReadPage() {
             key={a.title}
             className="group cursor-pointer overflow-hidden rounded-3xl border border-border bg-card shadow-soft transition hover:-translate-y-1 hover:shadow-pink"
           >
-            <div
-              className="grid h-32 place-items-center text-5xl"
-              style={{ background: `${a.accent}1f` }}
-            >
-              {a.emoji}
+            <div className="h-40 overflow-hidden">
+              <img
+                src={a.img}
+                alt={a.title}
+                loading="lazy"
+                className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
+              />
             </div>
             <div className="p-5">
               <span
