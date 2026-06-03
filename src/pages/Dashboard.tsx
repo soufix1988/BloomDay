@@ -6,7 +6,7 @@ import {
   type MoodEntry, type Habit, type Transaction, type Task, type Goal, type PeriodSettings,
 } from "@/data/schemas";
 import { dayKey, fromDayKey, prettyDate } from "@/lib/date";
-import { tools } from "@/data/tools";
+import { liveTools } from "@/data/tools";
 import { quoteOfTheDay } from "@/data/quotes";
 import { PopCard, SoftCard } from "@/components/common/Card";
 
@@ -180,22 +180,27 @@ export default function Dashboard() {
       </div>
 
       {/* Tool shortcuts */}
-      <h2 className="mb-3 mt-8 font-display text-2xl text-foreground">All your tools</h2>
+      <div className="mb-3 mt-8 flex items-center justify-between">
+        <h2 className="font-display text-2xl text-foreground">Your tools</h2>
+        <Link to="/app/tools" className="flex items-center gap-1 text-sm font-semibold text-primary">
+          See all <ArrowRight className="size-4" />
+        </Link>
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {tools.map((t) => {
+        {liveTools.map((t) => {
           const Icon = t.icon;
           return (
             <Link
               key={t.slug}
-              to={`/tools/${t.slug}`}
-              className="group flex items-center gap-3 rounded-3xl border-pop bg-card p-4 transition hover:-translate-y-1"
+              to={`/app/tools/${t.slug}`}
+              className="group flex items-center gap-3 rounded-3xl border border-border bg-card p-4 shadow-soft transition hover:-translate-y-1 hover:shadow-pink"
             >
-              <span className="grid size-11 shrink-0 place-items-center rounded-2xl text-white shadow-soft" style={{ background: t.accent }}>
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl" style={{ background: `${t.accent}1f`, color: t.accent }}>
                 <Icon className="size-5" />
               </span>
               <div className="min-w-0">
-                <p className="truncate font-bold text-foreground">{t.name}</p>
-                <p className="flex items-center gap-1 text-xs font-bold text-primary opacity-0 transition group-hover:opacity-100">
+                <p className="truncate font-semibold text-foreground">{t.name}</p>
+                <p className="flex items-center gap-1 text-xs font-semibold text-primary opacity-0 transition group-hover:opacity-100">
                   Open <ArrowRight className="size-3" />
                 </p>
               </div>

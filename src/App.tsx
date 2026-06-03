@@ -2,6 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-
 import AppLayout from "@/components/layout/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import Landing from "@/pages/Landing";
+import ToolsPage from "@/pages/ToolsPage";
+import ReadPage from "@/pages/ReadPage";
+import ShopPage from "@/pages/ShopPage";
+import MePage from "@/pages/MePage";
 import PeriodTracker from "@/pages/tools/PeriodTracker";
 import Journal from "@/pages/tools/Journal";
 import BudgetTracker from "@/pages/tools/BudgetTracker";
@@ -25,7 +29,7 @@ const TOOL_PAGES: Record<string, React.ComponentType> = {
 function ToolPage() {
   const { slug } = useParams<{ slug: string }>();
   const Page = slug ? TOOL_PAGES[slug] : undefined;
-  if (!Page) return <Navigate to="/app" replace />;
+  if (!Page) return <Navigate to="/app/tools" replace />;
   return <Page />;
 }
 
@@ -36,10 +40,14 @@ export default function App() {
         {/* Landing page — home */}
         <Route path="/" element={<Landing />} />
 
-        {/* App shell — dashboard + all tools */}
+        {/* App shell — Today / Tools / Read / Shop / Me */}
         <Route path="/app" element={<AppLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="tools" element={<ToolsPage />} />
           <Route path="tools/:slug" element={<ToolPage />} />
+          <Route path="read" element={<ReadPage />} />
+          <Route path="shop" element={<ShopPage />} />
+          <Route path="me" element={<MePage />} />
         </Route>
 
         {/* Catch-all → landing */}
