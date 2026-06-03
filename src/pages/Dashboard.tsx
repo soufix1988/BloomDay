@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { GlassWater, Flame, CheckCircle2, Sparkles, ArrowRight, CalendarDays } from "lucide-react";
-import pinMorning from "@/assets/pin-morning.jpg";
+import { photos } from "@/data/photos";
 import { useBloomState } from "@/hooks/useBloomState";
 import {
   KEYS, MOODS, currentStreak, predictCycle,
@@ -52,9 +52,9 @@ export default function Dashboard() {
       {/* Hero banner */}
       <div className="relative mb-6 overflow-hidden rounded-3xl shadow-soft">
         <img
-          src={pinMorning}
+          src={photos.morning}
           alt="Your Bloom today"
-          className="h-44 w-full object-cover object-top"
+          className="h-44 w-full object-cover object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
         <div className="absolute inset-0 flex flex-col justify-center px-6">

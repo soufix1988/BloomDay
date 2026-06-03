@@ -1,21 +1,19 @@
 import { Sparkles } from "lucide-react";
-import pinDesk from "@/assets/pin-desk.jpg";
-import pinMoney from "@/assets/pin-money.jpg";
-import pinRoses from "@/assets/pin-roses.jpg";
-import pinMorning from "@/assets/pin-morning.jpg";
-import pinPilates from "@/assets/pin-pilates.jpg";
 import featBlog from "@/assets/feat-blog.jpg";
+import featDiary from "@/assets/feat-diary.jpg";
+import { photos } from "@/data/photos";
 
 const products = [
-  { name: "Bloom Premium",   price: "$4.99/mo", desc: "Unlock every tool, AI insights & themes.", accent: "#ec6f9e", img: pinDesk,    featured: true },
-  { name: "Cycle Pro",       price: "$2.99/mo", desc: "Advanced predictions & symptom analytics.", accent: "#a87ad8", img: pinRoses  },
-  { name: "Printable Pack",  price: "$7",       desc: "Cute planner & journal printables (PDF).",  accent: "#efb24d", img: featBlog  },
-  { name: "Budget Bundle",   price: "$5",       desc: "Savings challenges & money templates.",      accent: "#5cb874", img: pinMoney  },
-  { name: "Wellness Pack",   price: "$6",       desc: "Morning routines & self-care rituals guide.",accent: "#e88ac0", img: pinMorning},
-  { name: "Move & Glow",     price: "$4",       desc: "Pilates & stretching guide for soft girls.", accent: "#5cc0cc", img: pinPilates},
+  { name: "Bloom Premium",   price: "$4.99/mo", desc: "Unlock every tool, AI insights & themes.", accent: "#ec6f9e", img: photos.desk,    featured: true },
+  { name: "Cycle Pro",       price: "$2.99/mo", desc: "Advanced predictions & symptom analytics.", accent: "#a87ad8", img: photos.roses   },
+  { name: "Printable Pack",  price: "$7",       desc: "Cute planner & journal printables (PDF).",  accent: "#efb24d", img: featDiary       },
+  { name: "Budget Bundle",   price: "$5",       desc: "Savings challenges & money templates.",      accent: "#5cb874", img: photos.money   },
+  { name: "Wellness Pack",   price: "$6",       desc: "Morning routines & self-care rituals guide.",accent: "#e88ac0", img: photos.morning },
+  { name: "Move & Glow",     price: "$4",       desc: "Pilates & stretching guide for soft girls.", accent: "#5cc0cc", img: photos.pilates },
 ];
 
 export default function ShopPage() {
+  const [featured, ...rest] = products;
   return (
     <div>
       <header className="mb-8">
@@ -30,27 +28,27 @@ export default function ShopPage() {
       {/* Featured banner */}
       <div className="group relative mb-6 cursor-pointer overflow-hidden rounded-3xl shadow-soft">
         <img
-          src={pinDesk}
-          alt="Bloom Premium"
-          className="h-52 w-full object-cover object-center transition duration-700 group-hover:scale-105"
+          src={featured.img}
+          alt={featured.name}
+          className="h-52 w-full object-cover transition duration-700 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between p-5">
           <div>
-            <span className="flex items-center gap-1 rounded-full bg-gradient-pink px-3 py-1 text-[10px] font-bold uppercase text-white shadow-soft w-fit">
+            <span className="flex w-fit items-center gap-1 rounded-full bg-gradient-pink px-3 py-1 text-[10px] font-bold uppercase text-white shadow-soft">
               <Sparkles className="size-3" /> Best value
             </span>
-            <h2 className="mt-2 font-display text-2xl text-white drop-shadow">Bloom Premium</h2>
-            <p className="text-sm text-white/80">Unlock every tool, AI insights & themes.</p>
+            <h2 className="mt-2 font-display text-2xl text-white drop-shadow">{featured.name}</h2>
+            <p className="text-sm text-white/80">{featured.desc}</p>
           </div>
-          <button className="rounded-full bg-gradient-pink px-5 py-2.5 text-sm font-bold text-white shadow-soft transition hover:scale-105">
-            $4.99/mo
+          <button className="shrink-0 rounded-full bg-gradient-pink px-5 py-2.5 text-sm font-bold text-white shadow-soft transition hover:scale-105">
+            {featured.price}
           </button>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {products.slice(1).map((p) => (
+        {rest.map((p) => (
           <div
             key={p.name}
             className="group relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-soft transition hover:-translate-y-1 hover:shadow-pink"
