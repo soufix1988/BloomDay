@@ -17,6 +17,7 @@ export const KEYS = {
   periodSettings: "period:settings", // PeriodSettings
   tasks: "planner:tasks", // Task[]
   goals: "goals:list", // Goal[]
+  cycleDayLogs: "cycle:daylogs", // Record<dayKey, CycleDayLog>
 } as const;
 
 /* ---------------- Types ---------------- */
@@ -61,6 +62,13 @@ export interface Task {
   date: string; // dayKey
   done: boolean;
   priority: "low" | "med" | "high";
+}
+
+export interface CycleDayLog {
+  flow?: "spotting" | "light" | "medium" | "heavy";
+  mood?: number; // 1–5
+  sex?: "protected" | "unprotected";
+  symptoms?: string[];
 }
 
 export interface Goal {
