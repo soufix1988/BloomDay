@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, X, Settings2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Settings2, Heart, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useBloomState } from "@/hooks/useBloomState";
 import {
   KEYS,
@@ -8,9 +9,6 @@ import {
   type MoodEntry,
 } from "@/data/schemas";
 import { dayKey, fromDayKey, daysBetween, addDays } from "@/lib/date";
-import { toolBySlug } from "@/data/tools";
-import ToolHeader from "@/components/common/ToolHeader";
-import { SoftCard } from "@/components/common/Card";
 
 // ── Phase config ──────────────────────────────────────────────────────────────
 
@@ -118,23 +116,6 @@ function buildMonthGrid(year: number, month: number): (Date | null)[] {
   return grid;
 }
 
-function energyForDay(day: number, cl: number, settings: PeriodSettings): number {
-  const ovulationDay = cl - 14;
-  const fertileStart = Math.max(settings.periodLength + 2, ovulationDay - 5);
-  if (day <= settings.periodLength) {
-    return 0.15 + (day / settings.periodLength) * 0.12;
-  } else if (day < fertileStart) {
-    const t = (day - settings.periodLength) / (fertileStart - settings.periodLength);
-    return 0.27 + t * 0.58;
-  } else if (day <= ovulationDay + 1) {
-    const t = (day - fertileStart) / Math.max(1, ovulationDay + 1 - fertileStart);
-    return 0.85 + Math.sin(t * Math.PI) * 0.15;
-  } else {
-    const t = (day - ovulationDay - 1) / Math.max(1, cl - ovulationDay - 1);
-    return 0.85 - t * 0.65;
-  }
-}
-
 function computeHealthScore(
   starts: string[],
   settings: PeriodSettings,
@@ -144,8 +125,6 @@ function computeHealthScore(
   const sorted = [...starts].sort();
   const lastStart = fromDayKey(sorted[sorted.length - 1]);
   const cl = calcCycleLength(starts, settings);
-
-  // Regularity (0–40 pts)
   let reg = starts.length === 1 ? 20 : 30;
   if (starts.length >= 3) {
     const diffs: number[] = [];
@@ -155,8 +134,6 @@ function computeHealthScore(
     const variance = diffs.reduce((s, d) => s + Math.abs(d - avg), 0) / diffs.length;
     reg = Math.max(0, Math.round(40 - variance * 4));
   }
-
-  // Engagement (0–40 pts)
   const daysSince = Math.min(daysBetween(lastStart, new Date()) + 1, cl);
   let logged = 0;
   for (let i = 0; i < daysSince; i++) {
@@ -164,17 +141,10 @@ function computeHealthScore(
     if (l && (l.flow || l.mood || l.sex || (l.symptoms?.length ?? 0) > 0)) logged++;
   }
   const eng = daysSince > 0 ? Math.round((logged / daysSince) * 40) : 0;
-
-  // Symptom lightness (0–20 pts)
-  const withSymptoms = Object.values(dayLogs).filter((l) => l.symptoms?.length);
-  const avgSym =
-    withSymptoms.length > 0
-      ? withSymptoms.reduce((s, l) => s + (l.symptoms?.length ?? 0), 0) /
-        withSymptoms.length
-      : 0;
-  const sym = Math.max(0, Math.round(20 - avgSym * 3));
-
-  return Math.min(100, reg + eng + sym);
+  const withSym = Object.values(dayLogs).filter((l) => l.symptoms?.length);
+  const avgSym = withSym.length > 0
+    ? withSym.reduce((s, l) => s + (l.symptoms?.length ?? 0), 0) / withSym.length : 0;
+  return Math.min(100, reg + eng + Math.max(0, Math.round(20 - avgSym * 3)));
 }
 
 function computeMoodByPhase(
@@ -183,10 +153,8 @@ function computeMoodByPhase(
   settings: PeriodSettings,
 ): Record<PhaseName, { sum: number; count: number }> {
   const out: Record<PhaseName, { sum: number; count: number }> = {
-    menstrual: { sum: 0, count: 0 },
-    follicular: { sum: 0, count: 0 },
-    ovulatory: { sum: 0, count: 0 },
-    luteal: { sum: 0, count: 0 },
+    menstrual: { sum: 0, count: 0 }, follicular: { sum: 0, count: 0 },
+    ovulatory: { sum: 0, count: 0 }, luteal: { sum: 0, count: 0 },
   };
   Object.entries(moodEntries).forEach(([dk, entry]) => {
     const phase = phaseForDate(fromDayKey(dk), starts, settings);
@@ -212,364 +180,23 @@ function computeSymptomPatterns(
       counts[s][phase] = (counts[s][phase] ?? 0) + 1;
     });
   });
-  return Object.entries(counts)
-    .map(([symptom, phases]) => {
-      const total = Object.values(phases).reduce((a, b) => a + b, 0);
-      const topPhase = (Object.entries(phases) as [PhaseName, number][]).sort(
-        (a, b) => b[1] - a[1],
-      )[0][0];
-      return { symptom, phase: topPhase, total };
-    })
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 4);
-}
-
-// ── Phase Horizon Bar ─────────────────────────────────────────────────────────
-
-function PhaseHorizon({
-  currentPhase,
-  cycleDay,
-}: {
-  currentPhase: PhaseName | null;
-  cycleDay: number | null;
-}) {
-  return (
-    <div className="mb-4 flex gap-2">
-      {PHASE_ORDER.map((p) => {
-        const ph = PHASES[p];
-        const active = p === currentPhase;
-        return (
-          <div
-            key={p}
-            className={`flex flex-1 flex-col items-center rounded-2xl py-3 transition-all duration-300 ${
-              active ? "shadow-soft scale-[1.06]" : "opacity-40"
-            }`}
-            style={{ background: ph.bg }}
-          >
-            <span className={`text-xl leading-none ${active ? "" : "grayscale"}`}>{ph.emoji}</span>
-            <span
-              className="mt-1 text-[10px] font-bold leading-none"
-              style={{ color: ph.accent }}
-            >
-              {ph.label}
-            </span>
-            {active && cycleDay !== null && (
-              <span className="mt-1 text-[9px] font-semibold text-muted-foreground">
-                Day {cycleDay}
-              </span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Phase Energy Arc (SVG) ────────────────────────────────────────────────────
-
-function CycleEnergyArc({
-  cycleDay,
-  cycleLength,
-  settings,
-  currentPhase,
-}: {
-  cycleDay: number;
-  cycleLength: number;
-  settings: PeriodSettings;
-  currentPhase: PhaseName;
-}) {
-  const W = 320;
-  const H = 72;
-  const PX = 8;
-  const PY = 10;
-  const iW = W - PX * 2;
-  const iH = H - PY * 2;
-
-  const points = Array.from({ length: cycleLength }, (_, i) => ({
-    x: PX + (i / (cycleLength - 1)) * iW,
-    y: PY + (1 - energyForDay(i + 1, cycleLength, settings)) * iH,
-  }));
-
-  let pathD = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 1; i < points.length; i++) {
-    const p = points[i - 1];
-    const c = points[i];
-    const t = 0.35;
-    pathD += ` C ${p.x + (c.x - p.x) * t} ${p.y} ${c.x - (c.x - p.x) * t} ${c.y} ${c.x} ${c.y}`;
-  }
-  const fillD = `${pathD} L ${points[points.length - 1].x} ${H} L ${points[0].x} ${H} Z`;
-
-  const ovulationDay = cycleLength - 14;
-  const fertileStart = Math.max(settings.periodLength + 2, ovulationDay - 5);
-  const phaseSegs: Array<{ phase: PhaseName; s: number; e: number }> = [
-    { phase: "menstrual",  s: 1,                        e: settings.periodLength },
-    { phase: "follicular", s: settings.periodLength + 1, e: fertileStart - 1 },
-    { phase: "ovulatory",  s: fertileStart,              e: ovulationDay + 1 },
-    { phase: "luteal",     s: ovulationDay + 2,          e: cycleLength },
-  ];
-
-  const dot = points[Math.min(cycleDay - 1, points.length - 1)];
-
-  return (
-    <SoftCard className="!p-4 mb-4">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        Energy Arc
-      </p>
-      <svg
-        width="100%"
-        viewBox={`0 0 ${W} ${H}`}
-        style={{ display: "block" }}
-      >
-        <defs>
-          <linearGradient id="arcFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ec6f9e" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#ec6f9e" stopOpacity="0" />
-          </linearGradient>
-          <clipPath id="arcClip">
-            <rect x={PX} y={PY} width={iW} height={iH + 2} />
-          </clipPath>
-        </defs>
-
-        {/* Phase background bands */}
-        {phaseSegs.map(({ phase, s, e }) => {
-          const x = PX + ((s - 1) / (cycleLength - 1)) * iW;
-          const w = ((e - s) / (cycleLength - 1)) * iW;
-          return (
-            <rect
-              key={phase}
-              x={x}
-              y={PY}
-              width={Math.max(0, w)}
-              height={iH}
-              fill={PHASES[phase].bg}
-              opacity={0.65}
-            />
-          );
-        })}
-
-        {/* Area fill */}
-        <path d={fillD} fill="url(#arcFill)" clipPath="url(#arcClip)" />
-
-        {/* Energy curve */}
-        <path d={pathD} fill="none" stroke="#ec6f9e" strokeWidth="2" strokeLinecap="round" />
-
-        {/* Current day indicator */}
-        <circle cx={dot.x} cy={dot.y} r="10" fill={PHASES[currentPhase].accent} opacity={0.2} />
-        <circle cx={dot.x} cy={dot.y} r="5.5" fill={PHASES[currentPhase].accent} />
-        <circle cx={dot.x} cy={dot.y} r="2.5" fill="white" />
-      </svg>
-
-      {/* Phase labels */}
-      <div className="mt-1 flex">
-        {phaseSegs.map(({ phase, s, e }) => {
-          const pct = ((e - s + 1) / cycleLength) * 100;
-          return (
-            <div key={phase} style={{ width: `${pct}%` }} className="text-center">
-              <span className="text-[9px] font-bold" style={{ color: PHASES[phase].accent }}>
-                {PHASES[phase].emoji}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </SoftCard>
-  );
-}
-
-// ── Phase Wellness Card ───────────────────────────────────────────────────────
-
-function PhaseWellnessCard({ phase }: { phase: PhaseName }) {
-  const ph = PHASES[phase];
-  const w = PHASE_WELLNESS[phase];
-  return (
-    <SoftCard className="!p-0 overflow-hidden mb-4">
-      <div className="px-5 py-4" style={{ background: ph.bg }}>
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">{ph.emoji}</span>
-          <div>
-            <p className="font-display text-lg text-foreground">{ph.label} Phase</p>
-            <p className="text-xs font-semibold" style={{ color: ph.accent }}>
-              {w.energy}
-            </p>
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3 p-4">
-        {(
-          [
-            { label: "Workout 🏃‍♀️", value: w.workout, span: false },
-            { label: "Nutrition 🥗", value: w.nutrition, span: false },
-            { label: "Ritual ✨", value: w.ritual, span: true },
-          ] as { label: string; value: string; span: boolean }[]
-        ).map(({ label, value, span }) => (
-          <div
-            key={label}
-            className={`rounded-2xl p-3 ${span ? "col-span-2" : ""}`}
-            style={{ background: ph.bg }}
-          >
-            <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">{label}</p>
-            <p className="text-xs font-semibold leading-snug text-foreground">{value}</p>
-          </div>
-        ))}
-      </div>
-      <p className="px-5 pb-4 text-center text-sm italic text-muted-foreground">
-        "{w.affirmation}"
-      </p>
-    </SoftCard>
-  );
-}
-
-// ── Mood × Cycle Insight ──────────────────────────────────────────────────────
-
-function MoodCycleInsight({
-  moodByPhase,
-}: {
-  moodByPhase: Record<PhaseName, { sum: number; count: number }>;
-}) {
-  const hasAny = PHASE_ORDER.some((p) => moodByPhase[p].count > 0);
-  if (!hasAny) return null;
-  return (
-    <SoftCard className="mb-4">
-      <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        Mood × Cycle
-      </p>
-      <div className="flex gap-2">
-        {PHASE_ORDER.map((p) => {
-          const { sum, count } = moodByPhase[p];
-          const ph = PHASES[p];
-          if (count === 0)
-            return (
-              <div
-                key={p}
-                className="flex flex-1 flex-col items-center rounded-2xl py-3 opacity-30"
-                style={{ background: ph.bg }}
-              >
-                <span className="text-lg grayscale">{ph.emoji}</span>
-                <span className="mt-1 text-[10px] text-muted-foreground">—</span>
-              </div>
-            );
-          const avg = sum / count;
-          const moodEmoji = MOOD_EMOJIS[Math.round(avg) - 1] ?? "😐";
-          return (
-            <div
-              key={p}
-              className="flex flex-1 flex-col items-center rounded-2xl py-3"
-              style={{ background: ph.bg }}
-            >
-              <span className="text-lg">{ph.emoji}</span>
-              <span className="mt-1 text-xl">{moodEmoji}</span>
-              <span className="mt-0.5 text-[10px] font-bold" style={{ color: ph.accent }}>
-                {avg.toFixed(1)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <p className="mt-2 text-center text-[10px] text-muted-foreground">
-        Average mood per cycle phase
-      </p>
-    </SoftCard>
-  );
-}
-
-// ── Symptom Pattern Insight ───────────────────────────────────────────────────
-
-function SymptomPatternInsight({
-  patterns,
-}: {
-  patterns: Array<{ symptom: string; phase: PhaseName; total: number }>;
-}) {
-  if (!patterns.length) return null;
-  return (
-    <SoftCard className="mb-4">
-      <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        Symptom Patterns
-      </p>
-      <div className="flex flex-col gap-2">
-        {patterns.map(({ symptom, phase, total }) => (
-          <div key={symptom} className="flex items-center gap-3">
-            <span
-              className="flex-1 rounded-full px-3 py-1.5 text-xs font-bold capitalize"
-              style={{ background: PHASES[phase].bg, color: PHASES[phase].accent }}
-            >
-              {symptom}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {PHASES[phase].emoji} {PHASES[phase].label}
-            </span>
-            <span className="rounded-full bg-blush px-2 py-0.5 text-xs font-bold text-secondary-foreground">
-              ×{total}
-            </span>
-          </div>
-        ))}
-      </div>
-    </SoftCard>
-  );
-}
-
-// ── Cycle Health Score ────────────────────────────────────────────────────────
-
-function CycleHealthScore({ score }: { score: number }) {
-  const color =
-    score >= 70 ? "#16a34a" : score >= 40 ? "#f59e0b" : "#ec6f9e";
-  const label =
-    score >= 70
-      ? "Lovely rhythm 🌸"
-      : score >= 40
-      ? "Getting there 🌱"
-      : "Log more for insights 💧";
-  return (
-    <SoftCard className="mb-4">
-      <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        Cycle Health Score
-      </p>
-      <div className="flex items-center gap-4">
-        <div
-          className="relative size-16 shrink-0 rounded-full"
-          style={{
-            background: `conic-gradient(${color} ${score}%, #f8f4f4 ${score}%)`,
-          }}
-        >
-          <div className="absolute inset-2 flex items-center justify-center rounded-full bg-card">
-            <span className="text-sm font-black text-foreground">{score}</span>
-          </div>
-        </div>
-        <div>
-          <p className="font-bold text-foreground">{label}</p>
-          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-            Regularity · logging streak · symptom load
-          </p>
-        </div>
-      </div>
-    </SoftCard>
-  );
+  return Object.entries(counts).map(([symptom, phases]) => {
+    const total = Object.values(phases).reduce((a, b) => a + b, 0);
+    const topPhase = (Object.entries(phases) as [PhaseName, number][]).sort((a, b) => b[1] - a[1])[0][0];
+    return { symptom, phase: topPhase, total };
+  }).sort((a, b) => b.total - a.total).slice(0, 4);
 }
 
 // ── Day Log Bottom Sheet ──────────────────────────────────────────────────────
 
 function DayLogSheet({
-  dk,
-  phase,
-  log,
-  isPeriodStart,
-  onChange,
-  onTogglePeriodStart,
-  onClose,
+  dk, phase, log, isPeriodStart, onChange, onTogglePeriodStart, onClose,
 }: {
-  dk: string;
-  phase: PhaseName | null;
-  log: CycleDayLog;
-  isPeriodStart: boolean;
-  onChange: (l: CycleDayLog) => void;
-  onTogglePeriodStart: () => void;
-  onClose: () => void;
+  dk: string; phase: PhaseName | null; log: CycleDayLog; isPeriodStart: boolean;
+  onChange: (l: CycleDayLog) => void; onTogglePeriodStart: () => void; onClose: () => void;
 }) {
   const ph = phase ? PHASES[phase] : null;
-  const label = fromDayKey(dk).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+  const label = fromDayKey(dk).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
   function toggleSymptom(s: string) {
     const cur = log.symptoms ?? [];
@@ -577,144 +204,94 @@ function DayLogSheet({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-sm"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-t-3xl bg-background shadow-2xl"
+        className="w-full max-w-lg rounded-t-[2rem] bg-background shadow-2xl overflow-hidden"
         style={{ borderTop: `4px solid ${ph?.accent ?? "var(--primary)"}` }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="max-h-[88dvh] overflow-y-auto p-6 pb-8">
-          {/* Header */}
-          <div className="mb-5 flex items-start justify-between">
+        {/* Sheet header */}
+        <div className="px-6 pt-5 pb-4" style={{ background: ph?.bg ?? "#fdf2f8" }}>
+          <div className="flex items-start justify-between">
             <div>
-              <p className="font-display text-xl text-foreground">{label}</p>
-              {ph && (
-                <p className="mt-0.5 text-xs font-bold" style={{ color: ph.accent }}>
-                  {ph.emoji} {ph.label} · {ph.desc}
-                </p>
-              )}
+              <p className="font-display text-2xl text-foreground">{label}</p>
+              {ph && <p className="text-sm font-bold" style={{ color: ph.accent }}>{ph.emoji} {ph.label} · {ph.desc}</p>}
             </div>
-            <button
-              onClick={onClose}
-              className="rounded-full p-1 text-muted-foreground hover:bg-blush transition"
-            >
+            <button onClick={onClose} className="rounded-full p-1.5 bg-white/60 text-muted-foreground hover:bg-white transition">
               <X className="size-5" />
             </button>
           </div>
+        </div>
 
+        <div className="max-h-[70dvh] overflow-y-auto px-6 pb-8 pt-4">
           {/* Period start */}
           <button
             onClick={onTogglePeriodStart}
             className={`mb-5 w-full rounded-2xl py-3 text-sm font-bold transition ${
-              isPeriodStart
-                ? "bg-rose-100 text-rose-600 hover:bg-rose-200"
-                : "bg-blush text-primary hover:scale-[1.01]"
+              isPeriodStart ? "bg-rose-100 text-rose-600 hover:bg-rose-200"
+              : "bg-gradient-pink text-primary-foreground shadow-pink hover:scale-[1.02]"
             }`}
           >
-            {isPeriodStart
-              ? "🩸 Period started here — tap to remove"
-              : "🩸 Mark as period start"}
+            {isPeriodStart ? "🩸 Period started here — tap to remove" : "🩸 Mark as period start"}
           </button>
 
-          {/* Flow */}
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Flow
-          </p>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Flow</p>
           <div className="mb-5 grid grid-cols-4 gap-2">
             {FLOW.map((f) => (
-              <button
-                key={f}
+              <button key={f}
                 onClick={() => onChange({ ...log, flow: log.flow === f ? undefined : f })}
-                className={`rounded-xl py-2 text-xs font-bold capitalize transition ${
-                  log.flow === f
-                    ? "bg-rose-400 text-white shadow-sm"
-                    : "bg-blush text-secondary-foreground hover:bg-rose-100"
+                className={`rounded-xl py-2.5 text-xs font-bold capitalize transition ${
+                  log.flow === f ? "bg-rose-400 text-white shadow-sm scale-105"
+                  : "bg-blush text-secondary-foreground hover:bg-rose-100"
                 }`}
-              >
-                {f}
-              </button>
+              >{f}</button>
             ))}
           </div>
 
-          {/* Mood */}
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Mood
-          </p>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Mood</p>
           <div className="mb-5 flex justify-between px-2">
             {MOOD_EMOJIS.map((emoji, i) => (
-              <button
-                key={i}
+              <button key={i}
                 onClick={() => onChange({ ...log, mood: log.mood === i + 1 ? undefined : i + 1 })}
-                className={`text-2xl transition-transform ${
-                  log.mood === i + 1
-                    ? "scale-[1.45]"
-                    : "opacity-40 hover:opacity-80 hover:scale-110"
-                }`}
-              >
-                {emoji}
-              </button>
+                className={`text-3xl transition-transform ${log.mood === i + 1 ? "scale-[1.4]" : "opacity-40 hover:opacity-80 hover:scale-110"}`}
+              >{emoji}</button>
             ))}
           </div>
 
-          {/* Intimacy */}
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Intimacy
-          </p>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Intimacy</p>
           <div className="mb-5 grid grid-cols-2 gap-2">
             {(["protected", "unprotected"] as const).map((s) => (
-              <button
-                key={s}
+              <button key={s}
                 onClick={() => onChange({ ...log, sex: log.sex === s ? undefined : s })}
                 className={`rounded-xl py-2.5 text-xs font-bold transition ${
                   log.sex === s
-                    ? s === "protected"
-                      ? "bg-emerald-400 text-white"
-                      : "bg-violet-400 text-white"
+                    ? s === "protected" ? "bg-emerald-400 text-white scale-105" : "bg-violet-400 text-white scale-105"
                     : "bg-blush text-secondary-foreground hover:bg-pink-100"
                 }`}
-              >
-                {s === "protected" ? "🛡️ Protected" : "💞 Unprotected"}
-              </button>
+              >{s === "protected" ? "🛡️ Protected" : "💞 Unprotected"}</button>
             ))}
           </div>
 
-          {/* Ovulation */}
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Ovulation
-          </p>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Ovulation</p>
           <button
             onClick={() => onChange({ ...log, ovulation: !log.ovulation })}
             className={`mb-5 w-full rounded-xl py-2.5 text-xs font-bold transition ${
-              log.ovulation
-                ? "bg-fuchsia-400 text-white"
-                : "bg-blush text-secondary-foreground hover:bg-fuchsia-100"
+              log.ovulation ? "bg-fuchsia-400 text-white scale-[1.02]"
+              : "bg-blush text-secondary-foreground hover:bg-fuchsia-100"
             }`}
-          >
-            {log.ovulation ? "🌸 Ovulation signs logged" : "🌸 Log ovulation signs"}
-          </button>
+          >{log.ovulation ? "🌸 Ovulation signs logged ✓" : "🌸 Log ovulation signs"}</button>
 
-          {/* Symptoms */}
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Symptoms
-          </p>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Symptoms</p>
           <div className="flex flex-wrap gap-2">
             {SYMPTOMS.map((s) => {
               const on = log.symptoms?.includes(s);
               return (
-                <button
-                  key={s}
-                  onClick={() => toggleSymptom(s)}
+                <button key={s} onClick={() => toggleSymptom(s)}
                   className={`rounded-full px-3 py-1.5 text-xs font-bold capitalize transition ${
-                    on
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-blush text-secondary-foreground hover:bg-pink-100"
+                    on ? "bg-gradient-pink text-primary-foreground shadow-pink"
+                    : "bg-blush text-secondary-foreground hover:bg-pink-100"
                   }`}
-                >
-                  {s}
-                </button>
+                >{s}</button>
               );
             })}
           </div>
@@ -727,11 +304,9 @@ function DayLogSheet({
 // ── Onboarding Modal ──────────────────────────────────────────────────────────
 
 function OnboardingModal({
-  onSave,
-  onClose,
+  onSave, onClose,
 }: {
-  onSave: (firstDay: string, settings: PeriodSettings) => void;
-  onClose: () => void;
+  onSave: (firstDay: string, settings: PeriodSettings) => void; onClose: () => void;
 }) {
   const now = new Date();
   const todayStr = dayKey();
@@ -740,105 +315,79 @@ function OnboardingModal({
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [cycleLength, setCycleLength] = useState(28);
   const [periodLength, setPeriodLength] = useState(5);
-
   const grid = useMemo(() => buildMonthGrid(vy, vm), [vy, vm]);
-  const monthLabel = new Date(vy, vm).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
-
-  const prevMonth = () => {
-    if (vm === 0) { setVm(11); setVy((y) => y - 1); } else setVm((m) => m - 1);
-  };
-  const nextMonth = () => {
-    if (vm === 11) { setVm(0); setVy((y) => y + 1); } else setVm((m) => m + 1);
-  };
+  const monthLabel = new Date(vy, vm).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const prevMonth = () => { if (vm === 0) { setVm(11); setVy((y) => y - 1); } else setVm((m) => m - 1); };
+  const nextMonth = () => { if (vm === 11) { setVm(0); setVy((y) => y + 1); } else setVm((m) => m + 1); };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm rounded-3xl bg-background p-6 shadow-2xl">
-        <h2 className="mb-1 font-script text-3xl text-gradient-pink">Start your cycle 🌸</h2>
-        <p className="mb-5 text-sm text-muted-foreground">
-          Pick the first day of your last period
-        </p>
+      <div className="w-full max-w-sm rounded-[2rem] bg-background shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-pink px-6 py-5 text-primary-foreground relative overflow-hidden">
+          <div className="absolute -top-8 -right-8 size-24 rounded-full bg-sunburst opacity-20 animate-spin-slow" />
+          <Sparkles className="absolute top-3 right-10 size-4 animate-sparkle opacity-70" />
+          <Heart className="absolute bottom-3 left-16 size-3 fill-current animate-float opacity-60" style={{ animationDelay: "1s" }} />
+          <p className="font-script text-xl opacity-90 relative z-10">let's get started</p>
+          <h2 className="font-display text-3xl relative z-10">Your Cycle 🌸</h2>
+          <p className="text-sm opacity-80 mt-1 relative z-10">Pick the first day of your last period</p>
+        </div>
 
-        {/* Mini picker calendar */}
-        <div className="mb-5 rounded-2xl bg-blush p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <button onClick={prevMonth} className="rounded-full p-1.5 hover:bg-white/60 transition">
-              <ChevronLeft className="size-4" />
-            </button>
-            <span className="text-sm font-bold text-foreground">{monthLabel}</span>
-            <button onClick={nextMonth} className="rounded-full p-1.5 hover:bg-white/60 transition">
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-          <div className="mb-1 grid grid-cols-7 text-center">
-            {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-              <span key={i} className="text-[10px] font-bold text-muted-foreground">{d}</span>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-0.5">
-            {grid.map((date, i) => {
-              if (!date) return <div key={i} />;
-              const dk = dayKey(date);
-              const isFuture = dk > todayStr;
-              const selected = dk === selectedKey;
-              return (
-                <button
-                  key={i}
-                  disabled={isFuture}
-                  onClick={() => setSelectedKey(dk)}
-                  className={`aspect-square rounded-xl text-xs font-bold transition ${
-                    selected
-                      ? "bg-gradient-pink text-primary-foreground shadow-pink"
-                      : isFuture
-                      ? "cursor-default text-muted-foreground/25"
+        <div className="p-5">
+          {/* Picker calendar */}
+          <div className="mb-5 rounded-2xl bg-blush p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <button onClick={prevMonth} className="rounded-full p-1.5 hover:bg-white/60 transition"><ChevronLeft className="size-4" /></button>
+              <span className="text-sm font-bold text-foreground">{monthLabel}</span>
+              <button onClick={nextMonth} className="rounded-full p-1.5 hover:bg-white/60 transition"><ChevronRight className="size-4" /></button>
+            </div>
+            <div className="mb-1 grid grid-cols-7 text-center">
+              {["M","T","W","T","F","S","S"].map((d, i) => (
+                <span key={i} className="text-[10px] font-bold text-muted-foreground">{d}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-0.5">
+              {grid.map((date, i) => {
+                if (!date) return <div key={i} />;
+                const dk = dayKey(date);
+                const isFuture = dk > todayStr;
+                const selected = dk === selectedKey;
+                return (
+                  <button key={i} disabled={isFuture} onClick={() => setSelectedKey(dk)}
+                    className={`aspect-square rounded-xl text-xs font-bold transition ${
+                      selected ? "bg-gradient-pink text-primary-foreground shadow-pink"
+                      : isFuture ? "cursor-default text-muted-foreground/25"
                       : "text-foreground hover:bg-white/70"
-                  }`}
-                >
-                  {date.getDate()}
-                </button>
-              );
-            })}
+                    }`}
+                  >{date.getDate()}</button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* Sliders */}
-        <div className="mb-6 space-y-4">
-          <label className="block text-xs font-bold text-secondary-foreground">
-            Average cycle length:{" "}
-            <span className="text-primary">{cycleLength} days</span>
-            <input
-              type="range" min={21} max={40} value={cycleLength}
-              onChange={(e) => setCycleLength(Number(e.target.value))}
-              className="mt-1 w-full accent-primary"
-            />
-          </label>
-          <label className="block text-xs font-bold text-secondary-foreground">
-            Bleeding duration:{" "}
-            <span className="text-primary">{periodLength} days</span>
-            <input
-              type="range" min={2} max={10} value={periodLength}
-              onChange={(e) => setPeriodLength(Number(e.target.value))}
-              className="mt-1 w-full accent-primary"
-            />
-          </label>
-        </div>
+          {/* Sliders */}
+          <div className="mb-6 space-y-4">
+            <label className="block text-xs font-bold text-secondary-foreground">
+              Average cycle length: <span className="text-primary">{cycleLength} days</span>
+              <input type="range" min={21} max={40} value={cycleLength}
+                onChange={(e) => setCycleLength(Number(e.target.value))} className="mt-1 w-full accent-primary" />
+            </label>
+            <label className="block text-xs font-bold text-secondary-foreground">
+              Bleeding duration: <span className="text-primary">{periodLength} days</span>
+              <input type="range" min={2} max={10} value={periodLength}
+                onChange={(e) => setPeriodLength(Number(e.target.value))} className="mt-1 w-full accent-primary" />
+            </label>
+          </div>
 
-        <button
-          disabled={!selectedKey}
-          onClick={() => selectedKey && onSave(selectedKey, { cycleLength, periodLength })}
-          className="w-full rounded-full bg-gradient-pink py-3 font-bold text-primary-foreground shadow-pink transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Start Tracking 🌸
-        </button>
-        <button
-          onClick={onClose}
-          className="mt-3 w-full text-xs text-muted-foreground hover:text-foreground transition"
-        >
-          Cancel
-        </button>
+          <button
+            disabled={!selectedKey}
+            onClick={() => selectedKey && onSave(selectedKey, { cycleLength, periodLength })}
+            className="w-full rounded-full bg-gradient-pink py-3.5 font-bold text-primary-foreground shadow-pink transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
+          >Start Tracking 🌸</button>
+          <button onClick={onClose} className="mt-3 w-full text-xs text-muted-foreground hover:text-foreground transition">
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -846,52 +395,26 @@ function OnboardingModal({
 
 // ── Settings Sheet ────────────────────────────────────────────────────────────
 
-function SettingsSheet({
-  settings,
-  onChange,
-  onClose,
-}: {
-  settings: PeriodSettings;
-  onChange: (s: PeriodSettings) => void;
-  onClose: () => void;
+function SettingsSheet({ settings, onChange, onClose }: {
+  settings: PeriodSettings; onChange: (s: PeriodSettings) => void; onClose: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-lg rounded-t-3xl bg-background p-6 pb-10 shadow-2xl"
-        style={{ borderTop: "4px solid #ec6f9e" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-5 flex items-center justify-between">
-          <p className="font-display text-xl text-foreground">Cycle settings</p>
-          <button
-            onClick={onClose}
-            className="rounded-full p-1 text-muted-foreground hover:bg-blush transition"
-          >
-            <X className="size-5" />
-          </button>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-t-[2rem] bg-background shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-gradient-pink px-6 py-4 text-primary-foreground flex items-center justify-between">
+          <p className="font-display text-xl">Cycle settings</p>
+          <button onClick={onClose} className="rounded-full p-1 bg-white/20 hover:bg-white/40 transition"><X className="size-5" /></button>
         </div>
-        <div className="space-y-5">
+        <div className="p-6 space-y-5">
           <label className="block text-xs font-bold text-secondary-foreground">
-            Average cycle length:{" "}
-            <span className="text-primary">{settings.cycleLength} days</span>
-            <input
-              type="range" min={21} max={40} value={settings.cycleLength}
-              onChange={(e) => onChange({ ...settings, cycleLength: Number(e.target.value) })}
-              className="mt-1 w-full accent-primary"
-            />
+            Average cycle length: <span className="text-primary">{settings.cycleLength} days</span>
+            <input type="range" min={21} max={40} value={settings.cycleLength}
+              onChange={(e) => onChange({ ...settings, cycleLength: Number(e.target.value) })} className="mt-1 w-full accent-primary" />
           </label>
           <label className="block text-xs font-bold text-secondary-foreground">
-            Bleeding duration:{" "}
-            <span className="text-primary">{settings.periodLength} days</span>
-            <input
-              type="range" min={2} max={10} value={settings.periodLength}
-              onChange={(e) => onChange({ ...settings, periodLength: Number(e.target.value) })}
-              className="mt-1 w-full accent-primary"
-            />
+            Bleeding duration: <span className="text-primary">{settings.periodLength} days</span>
+            <input type="range" min={2} max={10} value={settings.periodLength}
+              onChange={(e) => onChange({ ...settings, periodLength: Number(e.target.value) })} className="mt-1 w-full accent-primary" />
           </label>
         </div>
       </div>
@@ -902,21 +425,13 @@ function SettingsSheet({
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function PeriodTracker() {
-  const tool = toolBySlug("period")!;
   const [starts, setStarts] = useBloomState<string[]>(KEYS.periodStarts, []);
-  const [settings, setSettings] = useBloomState<PeriodSettings>(KEYS.periodSettings, {
-    cycleLength: 28,
-    periodLength: 5,
-  });
-  const [dayLogs, setDayLogs] = useBloomState<Record<string, CycleDayLog>>(
-    KEYS.cycleDayLogs,
-    {},
-  );
+  const [settings, setSettings] = useBloomState<PeriodSettings>(KEYS.periodSettings, { cycleLength: 28, periodLength: 5 });
+  const [dayLogs, setDayLogs] = useBloomState<Record<string, CycleDayLog>>(KEYS.cycleDayLogs, {});
   const [moodEntries] = useBloomState<Record<string, MoodEntry>>(KEYS.moodEntries, {});
 
   const today = new Date();
   const todayStr = dayKey();
-
   const [vy, setVy] = useState(today.getFullYear());
   const [vm, setVm] = useState(today.getMonth());
   const [selectedDk, setSelectedDk] = useState<string | null>(null);
@@ -926,184 +441,341 @@ export default function PeriodTracker() {
   const hasData = starts.length > 0;
   const currentPhase = hasData ? phaseForDate(today, starts, settings) : null;
   const cycDay = hasData ? todayCycleDay(starts, settings) : null;
-  const cl = hasData ? calcCycleLength(starts, settings) : 28;
 
-  // Derived insight data
-  const healthScore = useMemo(
-    () => computeHealthScore(starts, settings, dayLogs),
-    [starts, settings, dayLogs],
-  );
-  const moodByPhase = useMemo(
-    () => computeMoodByPhase(moodEntries, starts, settings),
-    [moodEntries, starts, settings],
-  );
-  const symptomPatterns = useMemo(
-    () => computeSymptomPatterns(dayLogs, starts, settings),
-    [dayLogs, starts, settings],
-  );
+  const healthScore = useMemo(() => computeHealthScore(starts, settings, dayLogs), [starts, settings, dayLogs]);
+  const moodByPhase = useMemo(() => computeMoodByPhase(moodEntries, starts, settings), [moodEntries, starts, settings]);
+  const symptomPatterns = useMemo(() => computeSymptomPatterns(dayLogs, starts, settings), [dayLogs, starts, settings]);
 
   const grid = useMemo(() => buildMonthGrid(vy, vm), [vy, vm]);
-  const monthLabel = new Date(vy, vm).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
-
-  const prevMonth = () => {
-    if (vm === 0) { setVm(11); setVy((y) => y - 1); } else setVm((m) => m - 1);
-  };
-  const nextMonth = () => {
-    if (vm === 11) { setVm(0); setVy((y) => y + 1); } else setVm((m) => m + 1);
-  };
+  const monthLabel = new Date(vy, vm).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const prevMonth = () => { if (vm === 0) { setVm(11); setVy((y) => y - 1); } else setVm((m) => m - 1); };
+  const nextMonth = () => { if (vm === 11) { setVm(0); setVy((y) => y + 1); } else setVm((m) => m + 1); };
 
   const handleOnboardingSave = (firstDay: string, s: PeriodSettings) => {
     setStarts([firstDay]);
     setSettings(s);
     setShowOnboarding(false);
   };
+  const selectedPhase = selectedDk ? phaseForDate(fromDayKey(selectedDk), starts, settings) : null;
 
-  const selectedPhase = selectedDk
-    ? phaseForDate(fromDayKey(selectedDk), starts, settings)
-    : null;
+  const ph = currentPhase ? PHASES[currentPhase] : null;
+  const w = currentPhase ? PHASE_WELLNESS[currentPhase] : null;
 
   return (
-    <div>
-      <ToolHeader tool={tool} />
+    <div className="relative -mx-4 sm:-mx-8 -mt-6 sm:-mt-10 overflow-x-hidden">
 
-      {/* 1 — Phase Horizon */}
-      <PhaseHorizon currentPhase={currentPhase} cycleDay={cycDay} />
+      {/* ── HERO ────────────────────────────────────────────────────────────── */}
+      <section className="relative bg-dots/70 px-4 sm:px-8 pt-6 pb-10">
+        {/* Ambient decorative sparkles */}
+        <Sparkles className="absolute top-6 left-6 size-4 text-primary/50 animate-sparkle" />
+        <Sparkles className="absolute top-10 right-10 size-5 text-primary animate-sparkle" style={{ animationDelay: ".8s" }} />
+        <Heart className="absolute top-24 left-3 size-4 text-hot fill-hot animate-float" style={{ animationDelay: ".5s" }} />
+        <Heart className="absolute top-14 right-4 size-3 text-primary fill-primary animate-float" style={{ animationDelay: "1.3s" }} />
 
-      {/* 2 — Energy Arc (only when tracking) */}
-      {hasData && currentPhase && cycDay !== null && (
-        <CycleEnergyArc
-          cycleDay={cycDay}
-          cycleLength={cl}
-          settings={settings}
-          currentPhase={currentPhase}
-        />
-      )}
+        {/* Back link */}
+        <Link to="/app/tools" className="mb-5 inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-primary transition">
+          <ChevronLeft className="size-4" /> All tools
+        </Link>
 
-      {/* 3 — Calendar */}
-      <SoftCard className="relative !p-4 mb-4">
-        <div className="mb-3 flex items-center justify-between">
-          <button onClick={prevMonth} className="rounded-full p-1.5 hover:bg-blush transition">
-            <ChevronLeft className="size-4" />
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="font-display text-base text-foreground">{monthLabel}</span>
-            {hasData && (
-              <button
-                onClick={() => setShowSettings(true)}
-                className="rounded-full p-1 text-muted-foreground hover:bg-blush transition"
-              >
-                <Settings2 className="size-3.5" />
-              </button>
+        {/* Hero card */}
+        <div className="relative bg-gradient-hero rounded-[2.5rem] border-pop shadow-pink p-6 sm:p-10 overflow-hidden">
+          {/* Spinning sunburst */}
+          <div className="absolute -top-20 -right-20 size-56 rounded-full bg-sunburst opacity-25 animate-spin-slow pointer-events-none" />
+          {/* Floating blob accent */}
+          <div className="absolute -bottom-10 -left-10 size-40 rounded-full bg-bubble animate-blob opacity-50 pointer-events-none" />
+
+          <Sparkles className="absolute top-5 left-10 size-5 text-primary/60 animate-sparkle" />
+          <Heart className="absolute bottom-6 right-10 size-6 text-hot fill-hot animate-float" />
+          <Heart className="absolute top-6 right-6 size-4 text-primary fill-primary animate-float" style={{ animationDelay: "2s" }} />
+
+          <div className="relative z-10">
+            <p className="font-script text-2xl text-hot">know your rhythm</p>
+            <h1 className="font-display text-6xl sm:text-7xl text-gradient-pink leading-tight drop-shadow-sm">
+              Cycle 🌸
+            </h1>
+
+            {hasData && ph && cycDay !== null ? (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-2 rounded-full bg-card px-5 py-2 text-base font-bold text-foreground shadow-soft border-pop">
+                  {ph.emoji} {ph.label} · Day {cycDay}
+                </span>
+                <span className="text-sm font-semibold text-secondary-foreground">{ph.desc}</span>
+              </div>
+            ) : (
+              <p className="mt-3 text-base text-secondary-foreground/80 max-w-sm">
+                Track your cycle, understand your moods & body patterns.
+              </p>
             )}
           </div>
-          <button onClick={nextMonth} className="rounded-full p-1.5 hover:bg-blush transition">
-            <ChevronRight className="size-4" />
-          </button>
         </div>
+      </section>
 
-        <div className="mb-1 grid grid-cols-7 text-center">
-          {DAY_HEADERS.map((d) => (
-            <span key={d} className="text-[10px] font-bold text-muted-foreground">{d}</span>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7 gap-1">
-          {grid.map((date, i) => {
-            if (!date) return <div key={i} />;
-            const dk = dayKey(date);
-            const isToday = dk === todayStr;
-            const isPeriodStart = starts.includes(dk);
-            const phase = hasData ? phaseForDate(date, starts, settings) : null;
-            const isFuture = date > today;
-            const log = dayLogs[dk];
-            const hasLog = !!(log?.flow || log?.mood || log?.sex || log?.ovulation || (log?.symptoms?.length ?? 0) > 0);
-
-            return (
-              <button
-                key={i}
-                onClick={() => (hasData ? setSelectedDk(dk) : setShowOnboarding(true))}
-                className={`relative flex flex-col items-center rounded-xl py-2 transition ${
-                  isToday ? "ring-2 ring-primary ring-offset-1" : ""
-                } ${hasData ? "hover:scale-105 hover:shadow-sm" : "cursor-pointer"}`}
-                style={{
-                  background: phase
-                    ? `${PHASES[phase].bg}${isFuture ? "80" : "dd"}`
-                    : "#f8f4f4",
-                }}
-              >
-                {isPeriodStart && (
-                  <span className="absolute right-0.5 top-0.5 text-[7px] leading-none">🩸</span>
-                )}
-                {log?.ovulation && (
-                  <span className="absolute left-0.5 top-0.5 text-[7px] leading-none">🌸</span>
-                )}
-                <span
-                  className={`text-xs font-bold leading-none ${
-                    isToday ? "text-primary" : isFuture ? "text-muted-foreground/60" : "text-foreground"
+      {/* ── PHASE HORIZON ──────────────────────────────────────────────────── */}
+      <section className="px-4 sm:px-8 -mt-5 relative z-10 mb-4">
+        <div className="rounded-3xl bg-card border-pop shadow-soft p-4">
+          <div className="grid grid-cols-4 gap-2">
+            {PHASE_ORDER.map((p) => {
+              const pp = PHASES[p];
+              const active = p === currentPhase;
+              return (
+                <div
+                  key={p}
+                  className={`flex flex-col items-center rounded-2xl py-4 transition-all duration-300 ${
+                    active ? "shadow-pink scale-[1.07]" : "opacity-60 hover:opacity-80"
                   }`}
+                  style={{ background: active ? `linear-gradient(135deg, ${pp.accent}cc, ${pp.accent}88)` : pp.bg }}
                 >
-                  {date.getDate()}
-                </span>
-                {hasLog && <span className="mt-1 size-1 rounded-full bg-primary" />}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Start Log overlay */}
-        {!hasData && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-background/70 backdrop-blur-[2px]">
-            <button
-              onClick={() => setShowOnboarding(true)}
-              className="animate-pulse rounded-full bg-gradient-pink px-8 py-4 text-base font-bold text-primary-foreground shadow-pink transition hover:animate-none hover:scale-105"
-            >
-              🌸 Start Log
-            </button>
-            <p className="mt-3 text-xs text-muted-foreground">Track your cycle beautifully</p>
+                  <span className={`text-2xl leading-none transition ${active ? "" : "grayscale"}`}>{pp.emoji}</span>
+                  <span className="mt-1.5 text-[10px] font-bold leading-none" style={{ color: active ? "white" : pp.accent }}>
+                    {pp.label}
+                  </span>
+                  {active && cycDay !== null && (
+                    <span className="mt-1 text-[9px] font-bold text-white/80">Day {cycDay}</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )}
-      </SoftCard>
-
-      {/* 4 — Phase legend */}
-      {hasData && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {PHASE_ORDER.map((p) => (
-            <span
-              key={p}
-              className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold"
-              style={{ background: PHASES[p].bg, color: PHASES[p].accent }}
-            >
-              {PHASES[p].emoji} {PHASES[p].label}
-            </span>
-          ))}
-          <span className="flex items-center gap-1.5 rounded-full bg-blush px-3 py-1 text-[10px] font-bold text-muted-foreground">
-            🩸 Period · 🌸 Ovulation · • Log
-          </span>
         </div>
+      </section>
+
+      {/* ── CALENDAR ────────────────────────────────────────────────────────── */}
+      <section className="relative px-4 sm:px-8 py-8 bg-checker/70 mb-4">
+        <Sparkles className="absolute top-4 right-8 size-4 text-primary/40 animate-sparkle" style={{ animationDelay: ".4s" }} />
+        <Heart className="absolute bottom-4 left-6 size-3 text-hot/50 fill-hot animate-float" style={{ animationDelay: "1.8s" }} />
+
+        <div className="relative bg-card rounded-3xl border-pop shadow-pink p-5 overflow-hidden">
+          {/* Corner decoration */}
+          <div className="absolute -bottom-6 -right-6 size-20 rounded-full bg-sunburst opacity-10 animate-spin-slow pointer-events-none" />
+
+          {/* Month nav */}
+          <div className="mb-4 flex items-center justify-between">
+            <button onClick={prevMonth} className="rounded-full p-2 hover:bg-blush transition"><ChevronLeft className="size-4" /></button>
+            <div className="flex items-center gap-2">
+              <span className="font-display text-xl text-foreground">{monthLabel}</span>
+              {hasData && (
+                <button onClick={() => setShowSettings(true)} className="rounded-full p-1 text-muted-foreground hover:bg-blush transition">
+                  <Settings2 className="size-3.5" />
+                </button>
+              )}
+            </div>
+            <button onClick={nextMonth} className="rounded-full p-2 hover:bg-blush transition"><ChevronRight className="size-4" /></button>
+          </div>
+
+          {/* Day headers */}
+          <div className="mb-2 grid grid-cols-7 text-center">
+            {DAY_HEADERS.map((d) => (
+              <span key={d} className="text-[10px] font-bold text-muted-foreground">{d}</span>
+            ))}
+          </div>
+
+          {/* Day cells */}
+          <div className="grid grid-cols-7 gap-1.5">
+            {grid.map((date, i) => {
+              if (!date) return <div key={i} />;
+              const dk = dayKey(date);
+              const isToday = dk === todayStr;
+              const isPeriodStart = starts.includes(dk);
+              const phase = hasData ? phaseForDate(date, starts, settings) : null;
+              const isFuture = date > today;
+              const log = dayLogs[dk];
+              const hasLog = !!(log?.flow || log?.mood || log?.sex || log?.ovulation || (log?.symptoms?.length ?? 0) > 0);
+
+              return (
+                <button
+                  key={i}
+                  onClick={() => hasData ? setSelectedDk(dk) : setShowOnboarding(true)}
+                  className={`relative flex flex-col items-center rounded-2xl py-2.5 transition-all ${
+                    isToday ? "ring-2 ring-primary ring-offset-1 scale-105" : ""
+                  } ${hasData ? "hover:scale-110 hover:shadow-md hover:-translate-y-0.5" : "cursor-pointer"}`}
+                  style={{ background: phase ? `${PHASES[phase].bg}${isFuture ? "70" : "ee"}` : "#f8f4f4" }}
+                >
+                  {isPeriodStart && <span className="absolute right-0.5 top-0.5 text-[7px]">🩸</span>}
+                  {log?.ovulation && <span className="absolute left-0.5 top-0.5 text-[7px]">🌸</span>}
+                  <span className={`text-xs font-bold ${isToday ? "text-primary" : isFuture ? "text-muted-foreground/50" : "text-foreground"}`}>
+                    {date.getDate()}
+                  </span>
+                  {hasLog && <span className="mt-0.5 size-1 rounded-full bg-primary" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Phase legend */}
+          {hasData && (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {PHASE_ORDER.map((p) => (
+                <span key={p} className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[9px] font-bold"
+                  style={{ background: PHASES[p].bg, color: PHASES[p].accent }}>
+                  {PHASES[p].emoji} {PHASES[p].label}
+                </span>
+              ))}
+              <span className="flex items-center gap-1 rounded-full bg-blush px-2.5 py-1 text-[9px] font-bold text-muted-foreground">
+                🩸 Period · 🌸 Ovulation · • Log
+              </span>
+            </div>
+          )}
+
+          {/* Start Log overlay */}
+          {!hasData && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-background/75 backdrop-blur-[3px]">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full bg-gradient-pink blur-xl opacity-50 animate-pulse" />
+                <button
+                  onClick={() => setShowOnboarding(true)}
+                  className="relative rounded-full bg-gradient-pink px-10 py-5 text-lg font-black text-primary-foreground shadow-pink transition hover:scale-110 hover:shadow-2xl"
+                >
+                  🌸 Start Log
+                </button>
+              </div>
+              <p className="mt-4 font-script text-xl text-hot">your journey starts here</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── PHASE WELLNESS ─────────────────────────────────────────────────── */}
+      {hasData && currentPhase && w && ph && (
+        <section className="relative px-4 sm:px-8 py-8 mb-4 overflow-hidden">
+          {/* Background sunburst */}
+          <div className="absolute inset-0 bg-sunburst opacity-10 animate-spin-slow pointer-events-none" />
+
+          <Sparkles className="absolute top-6 right-8 size-5 text-primary animate-sparkle" style={{ animationDelay: ".3s" }} />
+          <Heart className="absolute top-8 left-4 size-4 text-hot fill-hot animate-float" />
+          <Heart className="absolute bottom-6 right-6 size-5 text-primary fill-primary animate-float" style={{ animationDelay: "1.5s" }} />
+
+          <div className="relative bg-gradient-hero rounded-[2rem] border-pop shadow-pink overflow-hidden">
+            {/* Phase color header */}
+            <div className="px-6 py-6 relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${ph.bg}, white)` }}>
+              <div className="absolute -right-8 -top-8 size-28 rounded-full opacity-30 animate-blob" style={{ background: ph.accent }} />
+              <div className="relative z-10 flex items-center gap-4">
+                <span className="text-5xl">{ph.emoji}</span>
+                <div>
+                  <p className="font-script text-xl" style={{ color: ph.accent }}>you are in</p>
+                  <p className="font-display text-3xl text-foreground">{ph.label} Phase</p>
+                  <p className="text-sm font-semibold" style={{ color: ph.accent }}>{w.energy}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content grid */}
+            <div className="grid grid-cols-2 gap-3 p-5">
+              {([
+                { label: "Workout 🏃‍♀️", value: w.workout },
+                { label: "Nutrition 🥗", value: w.nutrition },
+                { label: "Ritual ✨", value: w.ritual, full: true },
+              ] as { label: string; value: string; full?: boolean }[]).map(({ label, value, full }) => (
+                <div key={label} className={`rounded-2xl p-4 ${full ? "col-span-2" : ""}`}
+                  style={{ background: ph.bg }}>
+                  <p className="mb-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">{label}</p>
+                  <p className="text-sm font-semibold leading-snug text-foreground">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Affirmation */}
+            <div className="px-6 pb-7 text-center">
+              <div className="flex justify-center gap-1 mb-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Sparkles key={i} className="size-3 text-primary animate-sparkle" style={{ animationDelay: `${i * 0.4}s` }} />
+                ))}
+              </div>
+              <p className="font-script text-2xl sm:text-3xl text-hot">"{w.affirmation}"</p>
+            </div>
+          </div>
+        </section>
       )}
 
-      {/* 5 — Phase Wellness Card */}
-      {hasData && currentPhase && <PhaseWellnessCard phase={currentPhase} />}
-
-      {/* 6 — Insights (shown when there's data to analyse) */}
+      {/* ── INSIGHTS ────────────────────────────────────────────────────────── */}
       {hasData && (
-        <>
-          <CycleHealthScore score={healthScore} />
-          <MoodCycleInsight moodByPhase={moodByPhase} />
-          <SymptomPatternInsight patterns={symptomPatterns} />
-        </>
+        <section className="relative px-4 sm:px-8 py-10 bg-dots-lg/70">
+          <Sparkles className="absolute top-6 left-8 size-4 text-primary/50 animate-sparkle" />
+          <Heart className="absolute top-8 right-6 size-4 text-hot fill-hot animate-float" style={{ animationDelay: "0.7s" }} />
+
+          {/* Section header */}
+          <div className="mb-6 text-center relative z-10">
+            <p className="font-script text-2xl text-hot">patterns & progress</p>
+            <h2 className="font-display text-3xl sm:text-4xl text-gradient-pink">Your Cycle Story</h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 relative z-10">
+            {/* Health Score */}
+            <div className="bg-card rounded-3xl border-pop shadow-soft p-5 relative overflow-hidden">
+              <div className="absolute -bottom-6 -right-6 size-20 rounded-full bg-sunburst opacity-10 animate-spin-slow" />
+              <p className="mb-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Cycle Health Score</p>
+              <div className="flex items-center gap-4">
+                <div className="relative shrink-0 size-20 rounded-full"
+                  style={{ background: `conic-gradient(var(--color-primary) ${healthScore}%, #f8f4f4 ${healthScore}%)` }}>
+                  <div className="absolute inset-2.5 flex items-center justify-center rounded-full bg-card">
+                    <span className="text-lg font-black text-foreground">{healthScore}</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="font-display text-xl text-foreground">
+                    {healthScore >= 70 ? "Lovely rhythm 🌸" : healthScore >= 40 ? "Getting there 🌱" : "Keep logging 💧"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">regularity · logging · symptoms</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Mood × Cycle */}
+            {(() => {
+              const hasAny = PHASE_ORDER.some((p) => moodByPhase[p].count > 0);
+              if (!hasAny) return null;
+              return (
+                <div className="bg-card rounded-3xl border-pop shadow-soft p-5">
+                  <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Mood × Cycle</p>
+                  <div className="flex gap-2">
+                    {PHASE_ORDER.map((p) => {
+                      const { sum, count } = moodByPhase[p];
+                      const pp = PHASES[p];
+                      if (count === 0) return (
+                        <div key={p} className="flex flex-1 flex-col items-center rounded-2xl py-3 opacity-25" style={{ background: pp.bg }}>
+                          <span className="text-xl grayscale">{pp.emoji}</span>
+                          <span className="mt-1 text-[9px] text-muted-foreground">—</span>
+                        </div>
+                      );
+                      const avg = sum / count;
+                      return (
+                        <div key={p} className="flex flex-1 flex-col items-center rounded-2xl py-3" style={{ background: pp.bg }}>
+                          <span className="text-xl">{pp.emoji}</span>
+                          <span className="mt-1 text-xl">{MOOD_EMOJIS[Math.round(avg) - 1] ?? "😐"}</span>
+                          <span className="text-[9px] font-bold" style={{ color: pp.accent }}>{avg.toFixed(1)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-center text-[10px] text-muted-foreground">avg mood per phase</p>
+                </div>
+              );
+            })()}
+
+            {/* Symptom Patterns */}
+            {symptomPatterns.length > 0 && (
+              <div className="bg-card rounded-3xl border-pop shadow-soft p-5 sm:col-span-2">
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Symptom Patterns</p>
+                <div className="flex flex-col gap-2">
+                  {symptomPatterns.map(({ symptom, phase, total }) => (
+                    <div key={symptom} className="flex items-center gap-3">
+                      <span className="flex-1 rounded-full px-3 py-2 text-xs font-bold capitalize"
+                        style={{ background: PHASES[phase].bg, color: PHASES[phase].accent }}>
+                        {symptom}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{PHASES[phase].emoji} {PHASES[phase].label}</span>
+                      <span className="rounded-full bg-gradient-pink px-2.5 py-1 text-[10px] font-bold text-primary-foreground">×{total}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       {/* Modals */}
-      {showOnboarding && (
-        <OnboardingModal onSave={handleOnboardingSave} onClose={() => setShowOnboarding(false)} />
-      )}
-      {showSettings && (
-        <SettingsSheet settings={settings} onChange={setSettings} onClose={() => setShowSettings(false)} />
-      )}
+      {showOnboarding && <OnboardingModal onSave={handleOnboardingSave} onClose={() => setShowOnboarding(false)} />}
+      {showSettings && <SettingsSheet settings={settings} onChange={setSettings} onClose={() => setShowSettings(false)} />}
       {selectedDk && (
         <DayLogSheet
           dk={selectedDk}
@@ -1113,9 +785,7 @@ export default function PeriodTracker() {
           onChange={(log) => setDayLogs((prev) => ({ ...prev, [selectedDk]: log }))}
           onTogglePeriodStart={() => {
             const dk = selectedDk;
-            setStarts((prev) =>
-              prev.includes(dk) ? prev.filter((d) => d !== dk) : [...prev, dk].sort(),
-            );
+            setStarts((prev) => prev.includes(dk) ? prev.filter((d) => d !== dk) : [...prev, dk].sort());
           }}
           onClose={() => setSelectedDk(null)}
         />
