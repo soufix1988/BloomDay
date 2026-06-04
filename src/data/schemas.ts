@@ -69,6 +69,7 @@ export interface CycleDayLog {
   mood?: number; // 1–5
   sex?: "protected" | "unprotected";
   symptoms?: string[];
+  ovulation?: boolean;
 }
 
 export interface Goal {
