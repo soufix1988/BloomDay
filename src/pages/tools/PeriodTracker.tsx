@@ -16,11 +16,11 @@ import { dayKey, fromDayKey, daysBetween, addDays } from "@/lib/date";
 
 type PhaseName = "menstrual" | "follicular" | "ovulatory" | "luteal";
 
-const PHASES: Record<PhaseName, { label: string; emoji: string; bg: string; accent: string; desc: string }> = {
-  menstrual:  { label: "Menstrual",  emoji: "🩸", bg: "#ffe4e6", accent: "#f43f5e", desc: "Flow & rest"  },
-  follicular: { label: "Follicular", emoji: "🌱", bg: "#dcfce7", accent: "#16a34a", desc: "Rise & glow"  },
-  ovulatory:  { label: "Ovulatory",  emoji: "🌸", bg: "#f3e8ff", accent: "#9333ea", desc: "Peak energy"  },
-  luteal:     { label: "Luteal",     emoji: "🌙", bg: "#dbeafe", accent: "#2563eb", desc: "Wind down"    },
+const PHASES: Record<PhaseName, { label: string; emoji: string; bg: string; calBg: string; accent: string; desc: string }> = {
+  menstrual:  { label: "Menstrual",  emoji: "🩸", bg: "#ffe4e6", calBg: "#fda4af", accent: "#f43f5e", desc: "Flow & rest"  },
+  follicular: { label: "Follicular", emoji: "🌱", bg: "#dcfce7", calBg: "#6ee7b7", accent: "#10b981", desc: "Rise & glow"  },
+  ovulatory:  { label: "Ovulatory",  emoji: "🌸", bg: "#f3e8ff", calBg: "#d8b4fe", accent: "#9333ea", desc: "Peak energy"  },
+  luteal:     { label: "Luteal",     emoji: "🌙", bg: "#dbeafe", calBg: "#7dd3fc", accent: "#0ea5e9", desc: "Wind down"    },
 };
 
 const PHASE_ORDER: PhaseName[] = ["menstrual", "follicular", "ovulatory", "luteal"];
@@ -276,7 +276,7 @@ function SettingsPanel({
                   }`}
                   style={active ? { background: `linear-gradient(135deg, ${g.color}22, ${g.color}11)`, borderColor: g.color } : {}}
                 >
-                  <span className={`text-4xl transition ${active ? "" : "grayscale opacity-60"}`}>{g.emoji}</span>
+                  <span className={`text-4xl transition ${active ? "scale-110 drop-shadow-md" : "scale-95"}`}>{g.emoji}</span>
                   <div className="flex-1">
                     <p className="font-display text-xl" style={{ color: active ? g.color : undefined }}>{g.label}</p>
                     <p className="text-xs text-muted-foreground leading-snug mt-0.5">{g.desc}</p>
@@ -468,7 +468,7 @@ function DayLogSheet({
                 {MOOD_EMOJIS.map((emoji, i) => (
                   <button key={i}
                     onClick={() => onChange({ ...log, mood: log.mood === i + 1 ? undefined : i + 1 })}
-                    className={`text-3xl transition-transform ${log.mood === i + 1 ? "scale-[1.4]" : "opacity-40 hover:opacity-80 hover:scale-110"}`}>
+                    className={`text-3xl transition-transform ${log.mood === i + 1 ? "scale-[1.4] drop-shadow-md" : "scale-90 hover:scale-110"}`}>
                     {emoji}
                   </button>
                 ))}
@@ -685,32 +685,42 @@ export default function PeriodTracker() {
       <section className="px-4 sm:px-8 -mt-5 relative z-10 mb-4">
         <div className="rounded-3xl bg-card border-pop shadow-soft p-4">
           <div className="grid grid-cols-4 gap-2">
-            {PHASE_ORDER.map((p) => {
+            {PHASE_ORDER.map((p, idx) => {
               const pp = PHASES[p];
               const active = p === currentPhase;
               const isFertile = p === "ovulatory" && (prefs.goal === "conceive" || prefs.goal === "avoid");
               return (
                 <div key={p}
-                  className={`relative flex flex-col items-center rounded-2xl py-4 transition-all duration-300 ${
-                    active ? "shadow-pink scale-[1.07]" : "opacity-60 hover:opacity-80"
+                  className={`relative flex flex-col items-center rounded-2xl py-4 transition-all duration-500 overflow-hidden ${
+                    active ? "shadow-pink scale-[1.1] ring-2 ring-white/70" : "hover:scale-105 hover:shadow-soft"
                   } ${isFertile && !active ? "ring-2 ring-offset-1" : ""}`}
                   style={{
-                    background: active ? `linear-gradient(135deg, ${pp.accent}cc, ${pp.accent}88)` : pp.bg,
+                    background: active
+                      ? `linear-gradient(135deg, ${pp.accent}ee, ${pp.accent}bb)`
+                      : `linear-gradient(135deg, ${pp.calBg}99, ${pp.bg})`,
                     "--tw-ring-color": prefs.goal === "conceive" ? "#16a34a" : "#9333ea",
                   } as React.CSSProperties}
                 >
+                  {/* Active glow pulse */}
+                  {active && (
+                    <div className="absolute inset-0 animate-pulse pointer-events-none rounded-2xl"
+                      style={{ background: `radial-gradient(circle at 50% 30%, ${pp.accent}55, transparent 70%)` }} />
+                  )}
                   {/* Conceive/avoid fertile indicator */}
                   {isFertile && (
-                    <span className="absolute -top-1.5 -right-1 text-[8px] font-black rounded-full px-1.5 py-0.5"
+                    <span className="absolute -top-1.5 -right-1 text-[8px] font-black rounded-full px-1.5 py-0.5 z-10"
                       style={{ background: prefs.goal === "conceive" ? "#16a34a" : "#9333ea", color: "white" }}>
                       {prefs.goal === "conceive" ? "FERTILE" : "AVOID"}
                     </span>
                   )}
-                  <span className={`text-2xl leading-none transition ${active ? "" : "grayscale"}`}>{pp.emoji}</span>
-                  <span className="mt-1.5 text-[10px] font-bold leading-none"
+                  <span
+                    className={`text-2xl leading-none relative z-10 ${active ? "animate-float" : ""}`}
+                    style={{ animationDelay: `${idx * 0.3}s` }}
+                  >{pp.emoji}</span>
+                  <span className="mt-1.5 text-[10px] font-bold leading-none relative z-10"
                     style={{ color: active ? "white" : pp.accent }}>{pp.label}</span>
                   {active && cycDay !== null && (
-                    <span className="mt-1 text-[9px] font-bold text-white/80">Day {cycDay}</span>
+                    <span className="mt-1 text-[9px] font-bold text-white/90 relative z-10 bg-white/20 rounded-full px-2 py-0.5">Day {cycDay}</span>
                   )}
                 </div>
               );
@@ -762,20 +772,29 @@ export default function PeriodTracker() {
               return (
                 <button key={i}
                   onClick={() => hasData ? setSelectedDk(dk) : setShowOnboarding(true)}
-                  className={`relative flex flex-col items-center rounded-2xl py-2.5 transition-all ${
-                    isToday ? "ring-2 ring-primary ring-offset-1 scale-105" : ""
+                  className={`relative flex flex-col items-center rounded-2xl py-2 transition-all ${
+                    isToday ? "ring-2 ring-primary ring-offset-1 scale-105 shadow-pink" : ""
                   } ${fertileRing ? "ring-2 ring-offset-1" : ""} ${hasData ? "hover:scale-110 hover:shadow-md hover:-translate-y-0.5" : "cursor-pointer"}`}
                   style={{
-                    background: phase ? `${PHASES[phase].bg}${isFuture ? "70" : "ee"}` : "#f8f4f4",
+                    background: phase
+                      ? isFuture ? `${PHASES[phase].bg}` : PHASES[phase].calBg
+                      : "#f3e8f3",
                     "--tw-ring-color": prefs.goal === "conceive" ? "#16a34a" : prefs.goal === "avoid" ? "#9333ea" : undefined,
                   } as React.CSSProperties}
                 >
-                  {isPeriodStart && <span className="absolute right-0.5 top-0.5 text-[7px]">🩸</span>}
-                  {log?.ovulation && <span className="absolute left-0.5 top-0.5 text-[7px]">🌸</span>}
-                  <span className={`text-xs font-bold ${isToday ? "text-primary" : isFuture ? "text-muted-foreground/50" : "text-foreground"}`}>
+                  {isPeriodStart && <span className="absolute right-0.5 top-0 text-[8px]">🩸</span>}
+                  {log?.ovulation && <span className="absolute left-0.5 top-0 text-[8px]">🌸</span>}
+                  <span className={`text-xs font-black ${isToday ? "text-primary" : isFuture ? "text-foreground/60" : "text-foreground"}`}>
                     {date.getDate()}
                   </span>
-                  {hasLog && <span className="mt-0.5 size-1 rounded-full bg-primary" />}
+                  {/* Tracking dots — one per logged category */}
+                  {hasLog && (
+                    <div className="mt-0.5 flex gap-[2px] flex-wrap justify-center">
+                      {log?.flow && <span className="size-1.5 rounded-full bg-rose-500" />}
+                      {log?.mood != null && <span className="size-1.5 rounded-full bg-amber-400" />}
+                      {log?.sex && <span className="size-1.5 rounded-full bg-violet-500" />}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -784,13 +803,18 @@ export default function PeriodTracker() {
           {hasData && (
             <div className="mt-4 flex flex-wrap gap-1.5">
               {PHASE_ORDER.map((p) => (
-                <span key={p} className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[9px] font-bold"
-                  style={{ background: PHASES[p].bg, color: PHASES[p].accent }}>
+                <span key={p} className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[9px] font-bold text-white"
+                  style={{ background: PHASES[p].accent }}>
                   {PHASES[p].emoji} {PHASES[p].label}
                 </span>
               ))}
-              <span className="flex items-center gap-1 rounded-full bg-blush px-2.5 py-1 text-[9px] font-bold text-muted-foreground">
-                🩸 Period · 🌸 Ovulation · • Log
+              <span className="flex items-center gap-2 rounded-full bg-blush px-2.5 py-1 text-[9px] font-bold text-secondary-foreground">
+                🩸 Start · 🌸 Ovul ·
+                <span className="flex gap-1 items-center">
+                  <span className="size-1.5 rounded-full bg-rose-500 inline-block" /> flow
+                  <span className="size-1.5 rounded-full bg-amber-400 inline-block" /> mood
+                  <span className="size-1.5 rounded-full bg-violet-500 inline-block" /> ♡
+                </span>
               </span>
             </div>
           )}
@@ -900,17 +924,17 @@ export default function PeriodTracker() {
                       const { sum, count } = moodByPhase[p];
                       const pp = PHASES[p];
                       if (count === 0) return (
-                        <div key={p} className="flex flex-1 flex-col items-center rounded-2xl py-3 opacity-25" style={{ background: pp.bg }}>
-                          <span className="text-xl grayscale">{pp.emoji}</span>
-                          <span className="mt-1 text-[9px] text-muted-foreground">—</span>
+                        <div key={p} className="flex flex-1 flex-col items-center rounded-2xl py-3" style={{ background: pp.bg }}>
+                          <span className="text-xl">{pp.emoji}</span>
+                          <span className="mt-1 text-[9px] text-muted-foreground font-bold">—</span>
                         </div>
                       );
                       const avg = sum / count;
                       return (
-                        <div key={p} className="flex flex-1 flex-col items-center rounded-2xl py-3" style={{ background: pp.bg }}>
+                        <div key={p} className="flex flex-1 flex-col items-center rounded-2xl py-3" style={{ background: pp.calBg }}>
                           <span className="text-xl">{pp.emoji}</span>
                           <span className="mt-1 text-xl">{MOOD_EMOJIS[Math.round(avg) - 1] ?? "😐"}</span>
-                          <span className="text-[9px] font-bold" style={{ color: pp.accent }}>{avg.toFixed(1)}</span>
+                          <span className="text-[9px] font-bold text-white drop-shadow-sm">{avg.toFixed(1)}</span>
                         </div>
                       );
                     })}
@@ -927,9 +951,9 @@ export default function PeriodTracker() {
                 <div className="flex flex-col gap-2">
                   {symptomPatterns.map(({ symptom, phase, total }) => (
                     <div key={symptom} className="flex items-center gap-3">
-                      <span className="flex-1 rounded-full px-3 py-2 text-xs font-bold capitalize"
-                        style={{ background: PHASES[phase].bg, color: PHASES[phase].accent }}>{symptom}</span>
-                      <span className="text-xs text-muted-foreground">{PHASES[phase].emoji} {PHASES[phase].label}</span>
+                      <span className="flex-1 rounded-full px-3 py-2 text-xs font-bold capitalize text-white"
+                        style={{ background: PHASES[phase].accent }}>{PHASES[phase].emoji} {symptom}</span>
+                      <span className="text-xs font-bold" style={{ color: PHASES[phase].accent }}>{PHASES[phase].label}</span>
                       <span className="rounded-full bg-gradient-pink px-2.5 py-1 text-[10px] font-bold text-primary-foreground">×{total}</span>
                     </div>
                   ))}
