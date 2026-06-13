@@ -15,6 +15,7 @@ export const KEYS = {
   budget: "budget:transactions", // Transaction[]
   periodStarts: "period:starts", // string[] (dayKeys)
   periodSettings: "period:settings", // PeriodSettings
+  periodLogs: "period:logs", // Record<dayKey, CycleDayLog>
   tasks: "planner:tasks", // Task[]
   goals: "goals:list", // Goal[]
 } as const;
@@ -53,6 +54,16 @@ export interface Transaction {
 export interface PeriodSettings {
   cycleLength: number;
   periodLength: number;
+}
+
+/** One day's logged symptoms for the Cycle tool. */
+export interface CycleDayLog {
+  flow?: "spotting" | "light" | "medium" | "heavy";
+  mood?: string[];
+  body?: string[];
+  skin?: string;
+  energy?: "low" | "medium" | "high";
+  note?: string;
 }
 
 export interface Task {
@@ -96,6 +107,38 @@ export function currentStreak(history: Record<string, boolean>): number {
   return streak;
 }
 
+export type CyclePhaseKey = "menstrual" | "follicular" | "ovulatory" | "luteal";
+
+export const PHASES: Record<CyclePhaseKey, { name: string; emoji: string; color: string; vibe: string }> = {
+  menstrual:  { name: "Menstrual",  emoji: "🔴", color: "#ef7a6f", vibe: "Rest, inward, cozy" },
+  follicular: { name: "Follicular", emoji: "🌱", color: "#7cc77c", vibe: "Energy rising, creative" },
+  ovulatory:  { name: "Ovulatory",  emoji: "✨", color: "#f7c948", vibe: "Peak glow, social, confident" },
+  luteal:     { name: "Luteal",     emoji: "🌙", color: "#a87ad8", vibe: "Wind down, introspective" },
+};
+
+export const PHASE_TIPS: Record<CyclePhaseKey, string[]> = {
+  menstrual: [
+    "Your iron is low today — eat spinach & dark chocolate 🍫",
+    "Rest is productive. A slow day is a good day 🌷",
+    "Gentle stretching can ease cramps better than staying still.",
+  ],
+  follicular: [
+    "Great day to start a new habit — your brain is extra sharp 🧠",
+    "Energy is rising — perfect time to plan ahead.",
+    "Try a new workout or recipe, you're more open to new things now.",
+  ],
+  ovulatory: [
+    "Schedule that important meeting — you're magnetic right now ✨",
+    "Great day for a date, photoshoot, or big conversation.",
+    "Your strength peaks today — go for that PR at the gym 💪",
+  ],
+  luteal: [
+    "Cravings are normal — your body needs ~200 extra calories today.",
+    "Be extra soft with yourself, your patience is naturally lower 💗",
+    "Good day for cozy, low-key plans and tidying up.",
+  ],
+};
+
 export interface CyclePrediction {
   hasData: boolean;
   cycleDay: number;
@@ -105,6 +148,18 @@ export interface CyclePrediction {
   fertileStart?: Date;
   fertileEnd?: Date;
   phase: string;
+  phaseKey: CyclePhaseKey;
+}
+
+/** Determine the cycle-phase key for a given cycle day (1-indexed). */
+export function phaseForCycleDay(cycleDay: number, settings: PeriodSettings): CyclePhaseKey {
+  const ovulationDay = settings.cycleLength - 14;
+  const fertileStartDay = ovulationDay - 5;
+  const fertileEndDay = ovulationDay + 1;
+  if (cycleDay <= settings.periodLength) return "menstrual";
+  if (cycleDay >= fertileStartDay && cycleDay <= fertileEndDay) return "ovulatory";
+  if (cycleDay < fertileStartDay) return "follicular";
+  return "luteal";
 }
 
 export function predictCycle(
@@ -112,7 +167,7 @@ export function predictCycle(
   settings: PeriodSettings,
 ): CyclePrediction {
   if (starts.length === 0) {
-    return { hasData: false, cycleDay: 0, phase: "—" };
+    return { hasData: false, cycleDay: 0, phase: "—", phaseKey: "follicular" };
   }
   const sorted = [...starts].sort();
   const lastStart = fromDayKey(sorted[sorted.length - 1]);
@@ -128,18 +183,19 @@ export function predictCycle(
     if (avg > 15 && avg < 45) cycleLength = Math.round(avg);
   }
 
-  const cycleDay = daysBetween(lastStart, new Date()) + 1;
+  const rawCycleDay = daysBetween(lastStart, new Date()) + 1;
+  // cycleDay wraps within [1, cycleLength] even if overdue
+  const cycleDay = ((rawCycleDay - 1) % cycleLength) + 1;
   const nextPeriod = addDays(lastStart, cycleLength);
   const ovulation = addDays(nextPeriod, -14);
   const fertileStart = addDays(ovulation, -5);
   const fertileEnd = addDays(ovulation, 1);
   const daysUntilNext = daysBetween(new Date(), nextPeriod);
 
-  let phase = "Follicular";
-  if (cycleDay <= settings.periodLength) phase = "Menstrual";
-  else if (new Date() >= fertileStart && new Date() <= fertileEnd)
-    phase = "Fertile window";
-  else if (daysUntilNext <= 5) phase = "Luteal (PMS)";
+  const phaseKey = phaseForCycleDay(cycleDay, { ...settings, cycleLength });
+  const phase = phaseKey === "ovulatory" ? "Fertile window"
+    : phaseKey === "luteal" && daysUntilNext <= 5 ? "Luteal (PMS)"
+    : PHASES[phaseKey].name;
 
   return {
     hasData: true,
@@ -150,5 +206,6 @@ export function predictCycle(
     fertileStart,
     fertileEnd,
     phase,
+    phaseKey,
   };
 }
